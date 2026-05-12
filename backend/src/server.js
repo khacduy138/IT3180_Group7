@@ -17,7 +17,11 @@ app.use('/api/fees', require('./routes/fees.routes'));
 app.use('/api/billing', require('./routes/billing.routes'));
 app.use('/api/dashboard', require('./routes/dashboard.routes'));
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+module.exports = app;
+
+if (process.env.NODE_ENV !== 'test') {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+};
