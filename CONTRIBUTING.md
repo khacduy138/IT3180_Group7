@@ -24,14 +24,14 @@
 
 ```bash
 # 1. Cập nhật code mới nhất từ main
-git checkout main
-git pull origin main
+git checkout develop
+git pull origin develop
 
 # 2. Quay lại branch đang làm
 git checkout feature/tên-task-của-bạn
 
 # 3. Merge code mới nhất vào branch của bạn (tránh conflict về sau)
-git merge main
+git merge develop
 ```
 
 ### Chọn task cần làm
