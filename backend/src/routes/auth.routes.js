@@ -1,3 +1,4 @@
+
 /*
  * Auth routes placeholder.
  *
@@ -9,3 +10,4 @@
  * - POST /auth/logout.
  * - POST /auth/change-password.
  */
+

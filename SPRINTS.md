@@ -13,6 +13,8 @@
 | Sprint 4 | Tuần 8–9 | Testing + Bug fixes + UAT |
 | Sprint 5 | Tuần 10 | Deploy + Documentation + Demo |
 
+[Link docs tổng hợp các sprints (Có mục lục cho dễ theo dõi)](https://docs.google.com/document/d/1ou5UNHPKGEX4TELiZ1RT6NRiSArdgtu4a0vzP9doIDM/edit?usp=sharing)
+
 ---
 
 ## Sprint 0 — Kickoff (Tuần 1)
