@@ -1,12 +1,13 @@
-const express = require('express');
-const router = express.Router();
 
-router.post('/login', (req, res) => {
-  res.json({ message: 'Login endpoint - to be implemented' });
-});
+/*
+ * Auth routes placeholder.
+ *
+ * Purpose:
+ * - Define URLs for login, logout, and change password.
+ *
+ * TODO:
+ * - POST /auth/login.
+ * - POST /auth/logout.
+ * - POST /auth/change-password.
+ */
 
-router.post('/register', (req, res) => {
-  res.json({ message: 'Register endpoint - to be implemented' });
-});
-
-module.exports = router;
