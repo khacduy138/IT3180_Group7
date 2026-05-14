@@ -42,10 +42,8 @@
     "nodemon": "^3.1.9",
     "sequelize-cli": "^6.6.2",
     "supertest": "^7.0.0"
-  }
-}
-
-"_mergeNote": {
+  },
+  "_mergeNote": {
     "status": "Resolved merge conflict between develop and feature/m1-backend-db-setup",
     "actions": [
       "Version: Set to 1.0.0 for first complete backend structure.",
@@ -56,4 +54,6 @@
     ],
     "resolvedBy": "Project Lead",
     "date": "2026-05-15"
-  },
+  }
+}
+
