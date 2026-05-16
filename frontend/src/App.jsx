@@ -4,6 +4,9 @@ import { Form, FormItem, FormLabel, FormField, FormControl, FormDescription, For
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './components/ui/Tabs';
 import { Input } from './components/ui/Input';
 import { useForm } from 'react-hook-form';
+import { NavigationMenuItem } from './components/ui/NavigationMenuItem';
+import TopBar from './components/ui/TopBar';
+import { Home } from 'lucide-react';
 
 function App() {
   const form = useForm({
@@ -14,13 +17,17 @@ function App() {
   });
 
   return (
+    <div>
+      <TopBar />
     <div className="bg-background text-foreground min-h-screen p-8">
+      
       <div className="max-w-2xl mx-auto">
         <h1 className="text-3xl font-bold text-primary mb-2">BlueMoon AMS</h1>
         <p className="text-lg text-muted-foreground mb-8">Apartment Management System</p>
         <div className="flex flex-col flex-wrap gap-4">
         <Button variant="default">Test Button</Button>
-
+        <Button variant="outline">Outline Button</Button>
+        <Button variant="with-icon">Button with Icon <Home /></Button>
         
 
         <Tabs defaultValue="profile" className="space-y-6">
@@ -31,6 +38,10 @@ function App() {
         </TabsList>
 
         <TabsContent value="profile">
+          <div>
+            <h2 className="text-2xl font-semibold mb-4">User Profile</h2>
+            <p className="text-sm text-muted-foreground mb-6">To disprises of thus againsolution deat undiscorns the proubler devoutly to othere's death a we end arms all; and thought himself might, and lose in the spurn awry, and man's we hue off them? To die: to takes, when hear thance to suffled of somethers tural contumely, and that under a bare bourns, and name whetheir current merit of of that slings of trageous pale coil, must give shuffles cast office, or with that under be, to suffer deat merit of outraveller who would fardels bear that dream: ay, to </p>
+          </div>
           <Form {...form}>
             <form className="space-y-4 border border-border rounded-lg p-4" onSubmit={form.handleSubmit((data) => console.log(data))}>
               <FormField
@@ -67,6 +78,8 @@ function App() {
               </Button>
             </form>
           </Form>
+          <Button variant="destructive" className="mt-4">Delete Account</Button>
+          
         </TabsContent>
 
         <TabsContent value="asasdas">
@@ -87,6 +100,7 @@ function App() {
 
         </div>
       </div>
+    </div>
     </div>
   );
 }

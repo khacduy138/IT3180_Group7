@@ -5,6 +5,8 @@
 @tailwind utilities;
 
 @layer base {
+
+
   :root {
     --background: 0 0% 98%;
     --foreground: 0 0% 9.8%;
@@ -27,7 +29,7 @@
     --green-foreground: 142 72% 87%;
     --yellow: 48 96% 53%;
     --yellow-foreground: 48 97% 88%;
-    
+
     --radius: 0.5rem;
   }
 
@@ -99,4 +101,6 @@
     overflow-x: auto;
     white-space: pre;
   }
+
+  svg { @apply stroke-[2] shrink-0; width: 1.2em; height: 1.2em;}
 }
