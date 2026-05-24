@@ -3,6 +3,7 @@ import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from './
 import { Form, FormItem, FormLabel, FormField, FormControl, FormMessage } from './components/ui/Form';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './components/ui/Tabs';
 import { Input } from './components/ui/Input';
+import { Select } from './components/ui/Select';
 import { useForm } from 'react-hook-form';
 //import {  } from './components/ui/NavigationMenuItem';
 import TopBar from './components/ui/TopBar';
@@ -13,6 +14,7 @@ function App() {
     defaultValues: {
       username: "",
       email: "",
+      role: "resident",
     },
   });
 
@@ -67,6 +69,34 @@ function App() {
                     <FormLabel>Email Address</FormLabel>
                     <FormControl>
                       <Input type="email" placeholder="..." {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="role"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Role</FormLabel>
+                    <FormControl>
+                      
+                      <Select
+                        placeholder="Choose a role"
+                        options={[
+                          { value: 'resident', label: 'Resident' },
+                          { value: 'manager', label: 'Manager' },
+                          { value: 'accountant', label: 'Accountant' },
+                        ]}
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        onBlur={field.onBlur}
+                        name={field.name}
+                        className="w-32"
+
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
