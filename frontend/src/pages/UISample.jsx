@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Button } from '../components/ui/Button';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '../components/ui/Accordion';
 import { Form, FormItem, FormLabel, FormField, FormControl, FormMessage } from '../components/ui/Form';
@@ -5,12 +6,15 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/Tabs'
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/Table';
+import { Modal, ModalHeader, ModalBody, ModalFooter } from '../components/ui/Modal';
 import { Tag } from '../components/ui/Tag';
 import { useForm } from 'react-hook-form';
 import TopBar from '../components/ui/TopBar';
 import { Home } from 'lucide-react';
 
 export default function UISample() {
+  const [open, setOpen] = useState(false);
+
   const form = useForm({
     defaultValues: {
       username: '',
@@ -62,6 +66,21 @@ export default function UISample() {
                 </TableBody>
               </Table>
             </div>
+
+            <Button variant="default" onClick={() => setOpen(true)}>
+              Open Modal
+            </Button>
+
+            
+
+            <Modal open={open} onOpenChange={setOpen}>
+            <ModalHeader>Confirm action</ModalHeader>
+            <ModalBody>Are you sure you want to continue?</ModalBody>
+            <ModalFooter>
+                <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+                <Button variant="default" onClick={() => setOpen(false)}>Confirm</Button>
+            </ModalFooter>
+            </Modal>
 
             <Tabs defaultValue="profile" className="space-y-6">
               <TabsList>
