@@ -12,7 +12,7 @@ export default function TopBar() {
     const visibleItems = TOP_BAR_ITEMS.filter(item => item.allowedRoles.includes(userRole));
 
     return (
-        <div className="w-full sticky border-b border-border bg-background px-6 h-16 grid grid-cols-4 text-foreground top-0">
+        <div className="sticky top-0 z-40 w-full border-b border-border bg-background px-6 h-16 grid grid-cols-4 text-foreground">
             <div className=" flex items-center gap-4 justify-start">
                 <span className="text-xl w-16 font-bold">BMS</span>
                 <Input placeholder="Search..." className="w-64" />

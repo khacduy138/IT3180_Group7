@@ -6,6 +6,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/Tabs'
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/Table';
+import { Card, CardHeader, CardTitle, CardValue, CardBody, CardFooter } from '../components/ui/Card';
 import { Modal, ModalHeader, ModalBody, ModalFooter } from '../components/ui/Modal';
 import { Toast } from '../components/ui/Toast';
 import { Tag } from '../components/ui/Tag';
@@ -193,6 +194,26 @@ export default function UISample() {
                 </Accordion>
               </TabsContent>
             </Tabs>
+                        <div className="grid gap-4 md:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Total Residents</CardTitle>
+                  <CardValue>128</CardValue>
+                </CardHeader>
+                <CardFooter>
+                  <p className="text-sm text-muted-foreground">+12 this month</p>
+                </CardFooter>
+              </Card>
+
+              <Card size="sm">
+                <CardHeader>
+                  <CardTitle>Flexible Card</CardTitle>
+                </CardHeader>
+                <CardBody>
+                  <p className="text-sm text-muted-foreground">This card can hold any JSX content, small or large.</p>
+                </CardBody>
+              </Card>
+            </div>
           </div>
         </div>
       </div>
