@@ -7,6 +7,7 @@ import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/Table';
 import { Modal, ModalHeader, ModalBody, ModalFooter } from '../components/ui/Modal';
+import { Toast } from '../components/ui/Toast';
 import { Tag } from '../components/ui/Tag';
 import { useForm } from 'react-hook-form';
 import TopBar from '../components/ui/TopBar';
@@ -14,6 +15,11 @@ import { Home } from 'lucide-react';
 
 export default function UISample() {
   const [open, setOpen] = useState(false);
+  const [toast, setToast] = useState({ open: false, variant: 'success', title: '', description: '' });
+
+  const showToast = (variant, title, description) => {
+    setToast({ open: true, variant, title, description });
+  };
 
   const form = useForm({
     defaultValues: {
@@ -71,6 +77,12 @@ export default function UISample() {
               Open Modal
             </Button>
 
+            <div className="flex flex-wrap gap-2">
+              <Button variant="default" onClick={() => showToast('success', 'Success', 'Saved successfully.')}>Success Toast</Button>
+              <Button variant="outline" onClick={() => showToast('warning', 'Warning', 'Please check your input.')}>Warning Toast</Button>
+              <Button variant="destructive" onClick={() => showToast('error', 'Error', 'Something went wrong.')}>Error Toast</Button>
+            </div>
+
             
 
             <Modal open={open} onOpenChange={setOpen}>
@@ -81,6 +93,15 @@ export default function UISample() {
                 <Button variant="default" onClick={() => setOpen(false)}>Confirm</Button>
             </ModalFooter>
             </Modal>
+
+            <Toast
+              open={toast.open}
+              onOpenChange={(nextOpen) => setToast((current) => ({ ...current, open: nextOpen }))}
+              variant={toast.variant}
+              title={toast.title}
+              description={toast.description}
+              duration={2500}
+            />
 
             <Tabs defaultValue="profile" className="space-y-6">
               <TabsList>
