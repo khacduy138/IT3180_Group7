@@ -14,7 +14,7 @@ export default function TopBar() {
     return (
         <div className="w-full sticky border-b border-border bg-background px-6 h-16 grid grid-cols-4 text-foreground top-0">
             <div className=" flex items-center gap-4 justify-start">
-                <span className="text-lg font-bold">BMS</span>
+                <span className="text-xl w-16 font-bold">BMS</span>
                 <Input placeholder="Search..." className="w-64" />
             </div>
             <div className=" flex items-center gap-4 justify-center col-span-2">
