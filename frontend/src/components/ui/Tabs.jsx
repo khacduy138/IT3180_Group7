@@ -21,16 +21,48 @@ const Tabs = React.forwardRef(({ className, defaultValue, value, onValueChange, 
 });
 Tabs.displayName = "Tabs";
 
-const TabsList = React.forwardRef(({ className, ...props }, ref) => (
-  <div
-    ref={ref}
-    className={cn(
-      "inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground",
-      className
-    )}
-    {...props}
-  />
-));
+const TabsList = React.forwardRef(({ className, children, ...props }, ref) => {
+  const { activeTab } = React.useContext(TabsContext);
+  const listRef = React.useRef(null);
+  const [indicatorStyle, setIndicatorStyle] = React.useState({});
+
+  React.useLayoutEffect(() => {
+    const container = listRef.current;
+    if (!container || !activeTab) return;
+
+    const activeTrigger = container.querySelector(`[data-tabs-trigger="${activeTab}"]`);
+    if (!activeTrigger) return;
+
+    setIndicatorStyle({
+      left: activeTrigger.offsetLeft,
+      top: activeTrigger.offsetTop,
+      width: activeTrigger.offsetWidth,
+      height: activeTrigger.offsetHeight,
+    });
+  }, [activeTab, children]);
+
+  return (
+    <div
+      ref={(node) => {
+        listRef.current = node;
+        if (typeof ref === 'function') ref(node);
+        else if (ref) ref.current = node;
+      }}
+      className={cn(
+        "relative inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground",
+        className
+      )}
+      {...props}
+    >
+      <span
+        aria-hidden="true"
+        className="absolute rounded-sm bg-background shadow-sm transition-all duration-300 ease-out"
+        style={indicatorStyle}
+      />
+      {children}
+    </div>
+  );
+});
 TabsList.displayName = "TabsList";
 
 const TabsTrigger = React.forwardRef(({ className, value, ...props }, ref) => {
@@ -44,9 +76,10 @@ const TabsTrigger = React.forwardRef(({ className, value, ...props }, ref) => {
       role="tab"
       aria-selected={isActive}
       data-state={isActive ? "active" : "inactive"}
+      data-tabs-trigger={value}
       onClick={() => setActiveTab(value)}
       className={cn(
-        "inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm",
+        "relative z-10 inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
         className
       )}
       {...props}
