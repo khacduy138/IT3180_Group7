@@ -95,13 +95,15 @@ const AccordionContent = React.forwardRef(({ className, children, ...props }, re
       ref={ref}
       data-state={isOpen ? "open" : "closed"}
       className={cn(
-        "overflow-hidden text-sm transition-all duration-200 ease-in-out",
-        isOpen ? "max-h-screen opacity-100" : "max-h-0 opacity-0"
+        "grid overflow-hidden text-sm transition-all duration-300 ease-in-out",
+        isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
       )}
       {...props}
     >
-      <div className={cn("pb-4 pt-0 text-muted-foreground", className)}>
-        {children}
+      <div className="min-h-0 overflow-hidden">
+        <div className={cn("pb-4 pt-0 text-muted-foreground", className)}>
+          {children}
+        </div>
       </div>
     </div>
   );
