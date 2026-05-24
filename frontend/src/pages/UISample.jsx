@@ -10,6 +10,7 @@ import { Card, CardHeader, CardTitle, CardValue, CardBody, CardFooter } from '..
 import { Modal, ModalHeader, ModalBody, ModalFooter } from '../components/ui/Modal';
 import { Toast } from '../components/ui/Toast';
 import { Tag } from '../components/ui/Tag';
+import Sidebar from '../components/ui/Sidebar';
 import { useForm } from 'react-hook-form';
 import TopBar from '../components/ui/TopBar';
 import { Home } from 'lucide-react';
@@ -17,6 +18,8 @@ import { Home } from 'lucide-react';
 export default function UISample() {
   const [open, setOpen] = useState(false);
   const [toast, setToast] = useState({ open: false, variant: 'success', title: '', description: '' });
+
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const showToast = (variant, title, description) => {
     setToast({ open: true, variant, title, description });
@@ -32,8 +35,11 @@ export default function UISample() {
 
   return (
     <div>
-      <TopBar />
-      <div className="bg-background text-foreground min-h-screen p-8">
+      <TopBar onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} sidebarOpen={sidebarOpen} />
+
+      <div className="flex flex-1 items-start">
+        <Sidebar open={sidebarOpen}/>
+        <main className="flex-1 p-8 overflow-x-hidden">
         <div className="max-w-2xl mx-auto">
           <h1 className="text-3xl font-bold text-primary mb-2">BlueMoon AMS</h1>
           <p className="text-lg text-muted-foreground mb-8">Apartment Management System</p>
@@ -214,8 +220,10 @@ export default function UISample() {
                 </CardBody>
               </Card>
             </div>
+            
           </div>
         </div>
+        </main>
       </div>
     </div>
   );
