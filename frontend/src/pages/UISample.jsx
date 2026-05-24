@@ -4,6 +4,8 @@ import { Form, FormItem, FormLabel, FormField, FormControl, FormMessage } from '
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/Tabs';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/Table';
+import { Tag } from '../components/ui/Tag';
 import { useForm } from 'react-hook-form';
 import TopBar from '../components/ui/TopBar';
 import { Home } from 'lucide-react';
@@ -29,6 +31,38 @@ export default function UISample() {
             <Button variant="outline">Outline Button</Button>
             <Button variant="with-icon">Button with Icon <Home /></Button>
 
+            <div className="rounded-lg border border-border p-4">
+              <h2 className="mb-3 text-lg font-semibold">Header</h2>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <TableRow>
+                    <TableCell>Apartment A-1203</TableCell>
+                    <TableCell>
+                      <Tag color="green">Active</Tag>
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell>Apartment B-0401</TableCell>
+                    <TableCell>
+                      <Tag color="yellow">Pending</Tag>
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell>Apartment C-0902</TableCell>
+                    <TableCell>
+                      <Tag color="red">Blocked</Tag>
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
+
             <Tabs defaultValue="profile" className="space-y-6">
               <TabsList>
                 <TabsTrigger value="profile">Profile Form</TabsTrigger>
@@ -38,7 +72,7 @@ export default function UISample() {
               <TabsContent value="profile">
                 <div>
                   <h2 className="text-2xl font-semibold mb-4">User Profile</h2>
-                  <p className="text-sm text-muted-foreground mb-6">To disprises of thus againsolution deat undiscorns the proubler devoutly to othere's death a we end arms all; and thought himself might, and lose in the spurn awry, and man's we hue off them? To die: to takes, when hear thance to suffled of somethers tural contumely, and that under a bare bourns, and name whetheir current merit of of that slings of trageous pale coil, must give shuffles cast office, or with that under be, to suffer deat merit of outraveller who would fardels bear that dream: ay, to </p>
+                  <p className="text-sm text-muted-foreground mb-6">To disprises of thus againsolution da we must give shuffles cast office, or with that under be, to suffer deat merit of outraveller who would fardels bear that dream: ay, to </p>
                 </div>
                 <Form {...form}>
                   <form className="space-y-4 border border-border rounded-lg p-4" onSubmit={form.handleSubmit((data) => console.log(data))}>
