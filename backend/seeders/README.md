@@ -1,9 +1,17 @@
 # Seeders
 
-This folder will contain Sequelize seed files.
+This folder contains Sequelize seed files.
 
-Planned Module 1 seed data:
+Planned seed data:
 
-- Default roles: `admin`, `accountant`, `staff`
-- Default permissions for auth, users, households, fees, invoices, payments, dashboard
+- Default roles: admin, accountant, staff
+- Default permissions for each module
+- Role-permission mappings
+- Default admin account
+
+Module 1 seed data:
+
+- Roles
+- Auth/user permissions
+- Initial role-permission mappings
 - Default admin account
