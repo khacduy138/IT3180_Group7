@@ -1,10 +1,34 @@
 # Migrations
 
-This folder will contain Sequelize migration files.
+Sequelize migration files for the BlueMoon AMS database schema.
 
-Planned Module 1 migrations:
+Current migration order:
 
-- Create `roles`
-- Create `permissions`
-- Create `users`
-- Create `role_permissions`
+1. `20260526000100-create-auth-core.js`
+   - `roles`
+   - `permissions`
+   - `users`
+   - `role_permissions`
+
+2. `20260526000200-create-household-resident.js`
+   - `households`
+   - `residents`
+   - `household_members`
+   - `vehicles`
+
+3. `20260526000300-create-fee-configuration.js`
+   - `fee_types`
+   - `fee_periods`
+   - `period_fees`
+
+4. `20260526000400-create-billing-payment.js`
+   - `fee_usages`
+   - `invoices`
+   - `invoice_items`
+   - `payments`
+
+Run migrations from `backend/`:
+
+```bash
+npm run db:migrate
+```
