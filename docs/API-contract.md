@@ -366,62 +366,87 @@ X-RateLimit-Reset: 1463113297
 
 # API Contract — Module 3: Fee Management
 
-**Module Owner:** Module 3
-**Purpose:** Quản lý cấu hình các loại phí, lịch sử đơn giá, kỳ thu phí và dữ liệu phí tiện ích phục vụ Module 4 tạo hóa đơn tự động.
+**Module Owner:** Module 3 — Fee Management  
+**Purpose:** Quản lý cấu hình loại phí, lịch sử đơn giá, kỳ thu phí và dữ liệu phí tiện ích phục vụ Module 4 tạo hóa đơn tự động.
 
-> **Integration Requirement:** Module 4 cần sử dụng endpoint `GET /fee-periods/:id` để lấy đầy đủ cấu hình phí tại một kỳ thu phí cụ thể. Response của endpoint này phải chứa loại phí, cách tính phí, đơn giá áp dụng và thông tin version giá để hóa đơn cũ không bị thay đổi khi admin cập nhật giá mới.
+> **Integration Requirement:** Module 4 sử dụng endpoint `GET /api/fee-periods/:id` để lấy cấu hình phí của một kỳ thu cụ thể. Response phải chứa cách tính phí, đơn giá đã chốt theo version, `priceHistoryId` và `isRequired` để hóa đơn lịch sử không thay đổi khi admin cập nhật giá mới.
+
+> **Implementation Alignment Note:** Route skeleton hiện tại của backend đang được mount tại prefix `/api`, vì vậy phần Module 3 trong tài liệu này sử dụng `/api/...`. Phần quy chuẩn chung phía trên đang đề xuất `/api/v1/...`; team cần thống nhất versioning toàn hệ thống ở một thay đổi riêng trước khi đổi route đang chạy.
 
 ---
 
-## 1. Authentication
+## 1. Authentication and Access Control
 
-Tất cả endpoints trong Module 3 yêu cầu JWT token:
+Tất cả endpoints Module 3 được thiết kế để yêu cầu JWT token:
 
 ```http
 Authorization: Bearer <JWT_TOKEN>
 Content-Type: application/json
 ```
 
+> **Sprint 1 Status:** Route skeleton đã được tạo, nhưng việc gắn middleware `authenticate` vẫn đang chờ Module 1 hoàn thiện `src/middleware/authenticate.js`. Sau khi middleware sẵn sàng, toàn bộ route Module 3 phải được bảo vệ trước khi release.
+
 ### Authentication Errors
 
-| Status | Code           | Meaning                                      |
-| ------ | -------------- | -------------------------------------------- |
-| `401`  | `UNAUTHORIZED` | Không có token hoặc token không hợp lệ       |
-| `403`  | `FORBIDDEN`    | Người dùng không có quyền thực hiện thao tác |
+| Status | Code | Meaning |
+| --- | --- | --- |
+| `401` | `UNAUTHORIZED` | Không có token, token không hợp lệ hoặc token hết hạn |
+| `403` | `FORBIDDEN` | Người dùng đã xác thực nhưng không có quyền thao tác |
 
 ---
 
-## 2. Business Overview
-
-Module 3 quản lý cấu hình phí của hệ thống chung cư. Module này không chịu trách nhiệm ghi nhận thanh toán của cư dân và không trực tiếp tạo hóa đơn cuối cùng. Module 4 sẽ sử dụng dữ liệu cấu hình từ Module 3 để generate hóa đơn.
+## 2. Business Rules
 
 ### 2.1. Supported Fee Calculation Types
 
-Hệ thống hỗ trợ ba cách tính phí chính:
+| Calculation Type | Meaning | Calculation Rule | Example |
+| --- | --- | --- | --- |
+| `per_m2` | Phí tính theo diện tích căn hộ/hộ dân | `unitPrice × area` | Phí quản lý: `8000.00 × 70 = 560000.00` |
+| `fixed` | Phí cố định cho mỗi hộ dân trong kỳ | `unitPrice` | Phí dịch vụ: `100000.00` |
+| `voluntary` | Khoản đóng góp tự nguyện | Không tự động cộng vào hóa đơn | Quỹ cộng đồng |
 
-| Calculation Type | Meaning                         | Calculation Formula         | Example                             |
-| ---------------- | ------------------------------- | --------------------------- | ----------------------------------- |
-| `per_m2`         | Phí tính theo diện tích căn hộ  | `unitPrice × apartmentArea` | Phí quản lý: `8,000 VND/m² × 70 m²` |
-| `fixed`          | Phí cố định cho mỗi hộ gia đình | `fixedAmount`               | Phí gửi xe máy: `100,000 VND/tháng` |
-| `voluntary`      | Khoản đóng góp tự nguyện        | Số tiền do cư dân lựa chọn  | Quỹ từ thiện, quỹ cộng đồng         |
+### 2.2. Monetary Value Rule
 
-### 2.2. Versioning Requirement
+Tất cả trường tiền tệ và phép tính tiền phải được xử lý bằng số thập phân chính xác. Backend đã sử dụng `decimal.js` trong helper `calculateFee(type, unitPrice, area)`.
 
-Khi admin thay đổi đơn giá của một loại phí, hệ thống **không được sửa trực tiếp giá đã áp dụng trong kỳ phí cũ**.
+Trong API examples, các giá trị tiền được biểu diễn bằng chuỗi decimal, ví dụ:
+
+```json
+{
+  "unitPrice": "9000.00",
+  "totalAmount": "630000.00"
+}
+```
+
+### 2.3. Price Versioning Rule
+
+Khi admin thay đổi đơn giá, hệ thống không ghi đè giá đã được dùng cho kỳ phí cũ.
 
 Ví dụ:
 
-* Tháng 05/2026, phí quản lý là `8,000 VND/m²`.
-* Tháng 06/2026, admin cập nhật thành `9,000 VND/m²`.
-* Hóa đơn tháng 05/2026 vẫn phải được tính theo `8,000 VND/m²`.
+- Tháng 05/2026: phí quản lý là `8000.00 VND/m²`.
+- Tháng 06/2026: đơn giá mới là `9000.00 VND/m²`.
+- Hóa đơn tháng 05/2026 vẫn sử dụng version giá `8000.00 VND/m²`.
 
-Để đảm bảo điều này, mỗi lần thay đổi giá sẽ tạo một bản ghi mới trong bảng:
+Mỗi lần đổi giá tạo một bản ghi mới trong:
 
 ```txt
 fee_type_price_history
 ```
 
-Mỗi kỳ thu phí sẽ tham chiếu tới đúng phiên bản giá đã được áp dụng tại thời điểm kỳ phí được tạo hoặc publish.
+Mỗi kỳ phí lưu liên kết tới đúng version giá thông qua:
+
+```txt
+fee_period_fee_types.price_history_id
+```
+
+### 2.4. Fee Period Lifecycle
+
+| Status | Meaning | Allowed Update |
+| --- | --- | --- |
+| `draft` | Kỳ phí đang soạn | Có thể sửa hoặc xóa |
+| `active` | Kỳ phí đã kích hoạt để Module 4 tạo hóa đơn | Không được đổi fee items hoặc version giá |
+| `closed` | Kỳ phí đã kết thúc | Chỉ đọc dữ liệu lịch sử |
 
 ---
 
@@ -429,107 +454,141 @@ Mỗi kỳ thu phí sẽ tham chiếu tới đúng phiên bản giá đã đư�
 
 ### 3.1. Fee Type
 
-Đại diện cho một loại phí trong hệ thống.
-
-| Field             | Type     | Required | Description                                   |
-| ----------------- | -------- | -------- | --------------------------------------------- |
-| `id`              | UUID     | Yes      | ID của loại phí                               |
-| `name`            | string   | Yes      | Tên loại phí                                  |
-| `code`            | string   | Yes      | Mã duy nhất của loại phí                      |
-| `description`     | string   | No       | Mô tả loại phí                                |
-| `calculationType` | enum     | Yes      | `per_m2`, `fixed`, hoặc `voluntary`           |
-| `unit`            | string   | Yes      | Đơn vị tính: `VND/m2`, `VND/household`, `VND` |
-| `isActive`        | boolean  | Yes      | Loại phí còn được sử dụng hay không           |
-| `createdAt`       | datetime | Yes      | Thời gian tạo                                 |
-| `updatedAt`       | datetime | Yes      | Thời gian cập nhật gần nhất                   |
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `id` | UUID | Yes | ID loại phí |
+| `name` | string | Yes | Tên loại phí |
+| `code` | string | Yes | Mã duy nhất, ví dụ `MANAGEMENT_FEE` |
+| `description` | string/null | No | Mô tả loại phí |
+| `calculationType` | enum | Yes | `per_m2`, `fixed`, `voluntary` |
+| `unit` | string | Yes | Ví dụ `VND/m2`, `VND/household`, `VND` |
+| `isActive` | boolean | Yes | Loại phí còn sử dụng hay không |
+| `createdAt` | datetime | Yes | Thời gian tạo |
+| `updatedAt` | datetime | Yes | Thời gian cập nhật |
 
 ### 3.2. Fee Type Price History
 
-Lưu lịch sử giá của từng loại phí.
-
-| Field           | Type      | Required | Description                                         |
-| --------------- | --------- | -------- | --------------------------------------------------- |
-| `id`            | UUID      | Yes      | ID của bản ghi giá                                  |
-| `feeTypeId`     | UUID      | Yes      | ID của loại phí                                     |
-| `unitPrice`     | number    | Yes      | Đơn giá áp dụng                                     |
-| `effectiveFrom` | date      | Yes      | Ngày bắt đầu áp dụng                                |
-| `effectiveTo`   | date/null | No       | Ngày kết thúc áp dụng; `null` nếu đang còn hiệu lực |
-| `createdBy`     | UUID      | Yes      | Admin tạo phiên bản giá                             |
-| `createdAt`     | datetime  | Yes      | Thời gian tạo                                       |
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `id` | UUID | Yes | ID version giá |
+| `feeTypeId` | UUID | Yes | ID loại phí |
+| `unitPrice` | decimal string | Yes | Đơn giá ở version này |
+| `effectiveFrom` | date | Yes | Ngày bắt đầu áp dụng |
+| `effectiveTo` | date/null | No | Ngày kết thúc; `null` nếu đang còn hiệu lực |
+| `createdBy` | UUID/null | No | Admin tạo version; nullable trong Sprint 1 do Module 1 chưa hoàn thiện |
+| `createdAt` | datetime | Yes | Thời gian tạo |
+| `updatedAt` | datetime | Yes | Thời gian cập nhật |
 
 ### 3.3. Fee Period
 
-Đại diện cho một kỳ thu phí, thường theo tháng.
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `id` | UUID | Yes | ID kỳ phí |
+| `name` | string | Yes | Tên kỳ phí, ví dụ `Phí tháng 06/2026` |
+| `month` | number | Yes | Tháng áp dụng |
+| `year` | number | Yes | Năm áp dụng |
+| `startDate` | date | Yes | Ngày bắt đầu |
+| `endDate` | date | Yes | Ngày kết thúc |
+| `dueDate` | date | Yes | Hạn thanh toán |
+| `status` | enum | Yes | `draft`, `active`, `closed` |
+| `createdAt` | datetime | Yes | Thời gian tạo |
+| `updatedAt` | datetime | Yes | Thời gian cập nhật |
 
-| Field       | Type     | Required | Description                           |
-| ----------- | -------- | -------- | ------------------------------------- |
-| `id`        | UUID     | Yes      | ID kỳ thu phí                         |
-| `name`      | string   | Yes      | Tên kỳ phí, ví dụ `Phí tháng 06/2026` |
-| `month`     | number   | Yes      | Tháng áp dụng                         |
-| `year`      | number   | Yes      | Năm áp dụng                           |
-| `startDate` | date     | Yes      | Ngày bắt đầu kỳ phí                   |
-| `endDate`   | date     | Yes      | Ngày kết thúc kỳ phí                  |
-| `dueDate`   | date     | Yes      | Hạn thanh toán                        |
-| `status`    | enum     | Yes      | `draft`, `published`, `closed`        |
-| `createdAt` | datetime | Yes      | Thời gian tạo                         |
-| `updatedAt` | datetime | Yes      | Thời gian cập nhật                    |
+### 3.4. Fee Period Fee Type
 
-### 3.4. Fee Period Item
+Đây là entity trung gian tương ứng với bảng `fee_period_fee_types`. Trong API response, danh sách này được trả dưới property `feeItems`.
 
-Danh sách loại phí được áp dụng trong một kỳ thu phí.
-
-| Field            | Type    | Required | Description                |
-| ---------------- | ------- | -------- | -------------------------- |
-| `id`             | UUID    | Yes      | ID item                    |
-| `feePeriodId`    | UUID    | Yes      | ID kỳ thu phí              |
-| `feeTypeId`      | UUID    | Yes      | ID loại phí                |
-| `priceHistoryId` | UUID    | Yes      | Phiên bản giá được sử dụng |
-| `isRequired`     | boolean | Yes      | Phí bắt buộc hay tự nguyện |
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `id` | UUID | Yes | ID liên kết |
+| `feePeriodId` | UUID | Yes | ID kỳ phí |
+| `feeTypeId` | UUID | Yes | ID loại phí |
+| `priceHistoryId` | UUID | Yes | ID version giá đã chốt cho kỳ phí |
+| `isRequired` | boolean | Yes | Phí bắt buộc hay tự nguyện |
+| `createdAt` | datetime | Yes | Thời gian tạo |
+| `updatedAt` | datetime | Yes | Thời gian cập nhật |
 
 ### 3.5. Utility Invoice
 
-Dữ liệu phí tiện ích được ghi nhận theo căn hộ và kỳ thu phí, phục vụ Module 4 generate hóa đơn cư dân.
+Dữ liệu tiện ích đầu vào theo hộ dân và kỳ phí. Module 4 sử dụng dữ liệu đã xác nhận khi tạo hóa đơn tổng.
 
-| Field             | Type     | Required | Description                                 |
-| ----------------- | -------- | -------- | ------------------------------------------- |
-| `id`              | UUID     | Yes      | ID bản ghi tiện ích                         |
-| `feePeriodId`     | UUID     | Yes      | Kỳ thu phí tương ứng                        |
-| `apartmentId`     | UUID     | Yes      | Căn hộ sử dụng tiện ích                     |
-| `utilityType`     | enum     | Yes      | `water`, `electricity`, `internet`, `other` |
-| `previousReading` | number   | No       | Chỉ số đầu kỳ                               |
-| `currentReading`  | number   | No       | Chỉ số cuối kỳ                              |
-| `usageAmount`     | number   | Yes      | Lượng tiêu thụ                              |
-| `unitPrice`       | number   | Yes      | Đơn giá sử dụng                             |
-| `totalAmount`     | number   | Yes      | Tổng tiền tiện ích                          |
-| `status`          | enum     | Yes      | `draft`, `confirmed`                        |
-| `createdAt`       | datetime | Yes      | Thời gian tạo                               |
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `id` | UUID | Yes | ID bản ghi tiện ích |
+| `feePeriodId` | UUID | Yes | ID kỳ phí |
+| `householdId` | UUID | Yes | ID hộ dân; FK sẽ bổ sung khi Module 2 chốt schema |
+| `utilityType` | enum | Yes | `electricity`, `water`, `internet` |
+| `previousReading` | decimal string/null | No | Chỉ số đầu kỳ |
+| `currentReading` | decimal string/null | No | Chỉ số cuối kỳ |
+| `usageAmount` | decimal string | Yes | Lượng tiêu thụ |
+| `unitPrice` | decimal string | Yes | Đơn giá tiện ích |
+| `totalAmount` | decimal string | Yes | Tổng tiền tiện ích |
+| `status` | enum | Yes | `draft`, `confirmed` |
+| `createdAt` | datetime | Yes | Thời gian tạo |
+| `updatedAt` | datetime | Yes | Thời gian cập nhật |
 
 ---
 
-# 4. Fee Types API
+## 4. Module 3 Response Convention
 
-## 4.1. Get All Fee Types
+Các response dưới đây tuân theo format chung của dự án.
 
-Lấy danh sách tất cả loại phí.
+### Success Example
+
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "message": "Operation completed successfully",
+  "data": {},
+  "timestamp": "2026-05-31T10:30:45.123Z"
+}
+```
+
+### Module 3 Error Example
+
+```json
+{
+  "success": false,
+  "statusCode": 404,
+  "message": "Fee type not found",
+  "errors": [
+    {
+      "field": null,
+      "code": "FEE_TYPE_NOT_FOUND",
+      "message": "Fee type not found"
+    }
+  ],
+  "timestamp": "2026-05-31T10:30:45.123Z"
+}
+```
+
+---
+
+# 5. Fee Types API
+
+## 5.1. Get All Fee Types
 
 ```http
-GET /fee-types
+GET /api/fee-types
 ```
 
 ### Query Parameters
 
-| Parameter         | Type    | Required | Description                   |
-| ----------------- | ------- | -------- | ----------------------------- |
-| `isActive`        | boolean | No       | Lọc theo trạng thái hoạt động |
-| `calculationType` | string  | No       | Lọc theo loại tính phí        |
-| `page`            | number  | No       | Trang hiện tại                |
-| `limit`           | number  | No       | Số item mỗi trang             |
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `isActive` | boolean | No | Lọc trạng thái hoạt động |
+| `calculationType` | string | No | Lọc theo `per_m2`, `fixed`, `voluntary` |
+| `pageNumber` | number | No | Trang hiện tại; mặc định `1` |
+| `pageSize` | number | No | Số phần tử mỗi trang; mặc định `20` |
 
 ### Success Response — `200 OK`
 
 ```json
 {
   "success": true,
+  "statusCode": 200,
+  "message": "Fee types retrieved successfully",
   "data": [
     {
       "id": "fee-type-001",
@@ -541,28 +600,30 @@ GET /fee-types
       "isActive": true,
       "currentPrice": {
         "id": "price-history-001",
-        "unitPrice": 8000,
+        "unitPrice": "8000.00",
         "effectiveFrom": "2026-01-01",
         "effectiveTo": null
       }
     }
   ],
   "pagination": {
-    "page": 1,
-    "limit": 10,
-    "total": 1
-  }
+    "pageNumber": 1,
+    "pageSize": 20,
+    "totalRecords": 1,
+    "totalPages": 1,
+    "hasNextPage": false,
+    "hasPreviousPage": false
+  },
+  "timestamp": "2026-05-31T10:30:45.123Z"
 }
 ```
 
 ---
 
-## 4.2. Create Fee Type
-
-Tạo loại phí mới.
+## 5.2. Create Fee Type
 
 ```http
-POST /fee-types
+POST /api/fee-types
 ```
 
 ### Request Body
@@ -574,26 +635,27 @@ POST /fee-types
   "description": "Phí quản lý vận hành chung cư",
   "calculationType": "per_m2",
   "unit": "VND/m2",
-  "initialUnitPrice": 8000,
+  "initialUnitPrice": "8000.00",
   "effectiveFrom": "2026-01-01"
 }
 ```
 
 ### Validation Rules
 
-| Field              | Rule                                    |
-| ------------------ | --------------------------------------- |
-| `name`             | Không được để trống                     |
-| `code`             | Bắt buộc, duy nhất trong hệ thống       |
-| `calculationType`  | Chỉ nhận `per_m2`, `fixed`, `voluntary` |
-| `initialUnitPrice` | Phải lớn hơn hoặc bằng `0`              |
-| `effectiveFrom`    | Phải là ngày hợp lệ                     |
+| Field | Rule |
+| --- | --- |
+| `name` | Bắt buộc, không được để trống |
+| `code` | Bắt buộc, duy nhất trong hệ thống |
+| `calculationType` | Chỉ nhận `per_m2`, `fixed`, `voluntary` |
+| `initialUnitPrice` | Decimal hợp lệ và không âm |
+| `effectiveFrom` | Ngày hợp lệ |
 
 ### Success Response — `201 Created`
 
 ```json
 {
   "success": true,
+  "statusCode": 201,
   "message": "Fee type created successfully",
   "data": {
     "id": "fee-type-001",
@@ -604,20 +666,21 @@ POST /fee-types
     "isActive": true,
     "currentPrice": {
       "id": "price-history-001",
-      "unitPrice": 8000,
+      "unitPrice": "8000.00",
       "effectiveFrom": "2026-01-01",
       "effectiveTo": null
     }
-  }
+  },
+  "timestamp": "2026-05-31T10:30:45.123Z"
 }
 ```
 
 ---
 
-## 4.3. Get Fee Type Detail
+## 5.3. Get Fee Type Detail
 
 ```http
-GET /fee-types/:id
+GET /api/fee-types/:id
 ```
 
 ### Success Response — `200 OK`
@@ -625,6 +688,8 @@ GET /fee-types/:id
 ```json
 {
   "success": true,
+  "statusCode": 200,
+  "message": "Fee type retrieved successfully",
   "data": {
     "id": "fee-type-001",
     "name": "Phí quản lý",
@@ -635,22 +700,23 @@ GET /fee-types/:id
     "isActive": true,
     "currentPrice": {
       "id": "price-history-002",
-      "unitPrice": 9000,
+      "unitPrice": "9000.00",
       "effectiveFrom": "2026-06-01",
       "effectiveTo": null
     }
-  }
+  },
+  "timestamp": "2026-05-31T10:30:45.123Z"
 }
 ```
 
 ---
 
-## 4.4. Update Fee Type Information
+## 5.4. Update Fee Type Metadata
 
-Chỉ cập nhật metadata của loại phí. Không sử dụng endpoint này để thay đổi đơn giá.
+Endpoint này chỉ cập nhật thông tin loại phí, không thay đổi đơn giá.
 
 ```http
-PATCH /fee-types/:id
+PATCH /api/fee-types/:id
 ```
 
 ### Request Body
@@ -668,24 +734,26 @@ PATCH /fee-types/:id
 ```json
 {
   "success": true,
+  "statusCode": 200,
   "message": "Fee type updated successfully",
   "data": {
     "id": "fee-type-001",
     "name": "Phí quản lý vận hành",
     "description": "Phí quản lý và bảo trì khu vực chung",
     "isActive": true
-  }
+  },
+  "timestamp": "2026-05-31T10:30:45.123Z"
 }
 ```
 
 ---
 
-## 4.5. Deactivate Fee Type
+## 5.5. Deactivate Fee Type
 
-Không xóa cứng loại phí đã từng được sử dụng trong kỳ thu phí hoặc hóa đơn. Endpoint này chỉ chuyển loại phí về trạng thái không hoạt động.
+Không xóa cứng loại phí từng được dùng trong kỳ phí hoặc hóa đơn; endpoint chuyển `isActive` về `false`.
 
 ```http
-DELETE /fee-types/:id
+DELETE /api/fee-types/:id
 ```
 
 ### Success Response — `200 OK`
@@ -693,18 +761,24 @@ DELETE /fee-types/:id
 ```json
 {
   "success": true,
-  "message": "Fee type deactivated successfully"
+  "statusCode": 200,
+  "message": "Fee type deactivated successfully",
+  "data": {
+    "id": "fee-type-001",
+    "isActive": false
+  },
+  "timestamp": "2026-05-31T10:30:45.123Z"
 }
 ```
 
 ---
 
-# 5. Fee Type Price History API
+# 6. Fee Type Price History API
 
-## 5.1. Get Price History of a Fee Type
+## 6.1. Get Price History of a Fee Type
 
 ```http
-GET /fee-types/:id/price-history
+GET /api/fee-types/:id/price-history
 ```
 
 ### Success Response — `200 OK`
@@ -712,40 +786,43 @@ GET /fee-types/:id/price-history
 ```json
 {
   "success": true,
+  "statusCode": 200,
+  "message": "Fee price history retrieved successfully",
   "data": [
     {
       "id": "price-history-001",
       "feeTypeId": "fee-type-001",
-      "unitPrice": 8000,
+      "unitPrice": "8000.00",
       "effectiveFrom": "2026-01-01",
       "effectiveTo": "2026-05-31"
     },
     {
       "id": "price-history-002",
       "feeTypeId": "fee-type-001",
-      "unitPrice": 9000,
+      "unitPrice": "9000.00",
       "effectiveFrom": "2026-06-01",
       "effectiveTo": null
     }
-  ]
+  ],
+  "timestamp": "2026-05-31T10:30:45.123Z"
 }
 ```
 
 ---
 
-## 5.2. Create New Price Version
+## 6.2. Create New Price Version
 
-Khi admin thay đổi giá, hệ thống tạo một price version mới thay vì ghi đè bản ghi cũ.
+Khi admin thay đổi giá, hệ thống tạo version mới thay vì ghi đè bản ghi lịch sử.
 
 ```http
-POST /fee-types/:id/price-history
+POST /api/fee-types/:id/price-history
 ```
 
 ### Request Body
 
 ```json
 {
-  "unitPrice": 9000,
+  "unitPrice": "9000.00",
   "effectiveFrom": "2026-06-01"
 }
 ```
@@ -753,52 +830,56 @@ POST /fee-types/:id/price-history
 ### Processing Rules
 
 1. Kiểm tra loại phí tồn tại.
-2. Kiểm tra `effectiveFrom` hợp lệ.
-3. Đóng phiên bản giá hiện tại bằng cách cập nhật `effectiveTo` thành ngày ngay trước `effectiveFrom` mới.
+2. Kiểm tra `unitPrice` và `effectiveFrom` hợp lệ.
+3. Đóng version đang áp dụng bằng cách đặt `effectiveTo` là ngày ngay trước `effectiveFrom` mới.
 4. Tạo bản ghi mới trong `fee_type_price_history`.
-5. Không làm thay đổi các `fee_period` đã publish trước đó.
+5. Không thay đổi version giá được tham chiếu bởi các kỳ phí đã ở trạng thái `active` hoặc `closed`.
 
 ### Success Response — `201 Created`
 
 ```json
 {
   "success": true,
+  "statusCode": 201,
   "message": "New fee price version created successfully",
   "data": {
     "id": "price-history-002",
     "feeTypeId": "fee-type-001",
-    "unitPrice": 9000,
+    "unitPrice": "9000.00",
     "effectiveFrom": "2026-06-01",
     "effectiveTo": null
-  }
+  },
+  "timestamp": "2026-05-31T10:30:45.123Z"
 }
 ```
 
 ---
 
-# 6. Fee Periods API
+# 7. Fee Periods API
 
-## 6.1. Get All Fee Periods
+## 7.1. Get All Fee Periods
 
 ```http
-GET /fee-periods
+GET /api/fee-periods
 ```
 
 ### Query Parameters
 
-| Parameter | Type   | Required | Description                    |
-| --------- | ------ | -------- | ------------------------------ |
-| `month`   | number | No       | Lọc theo tháng                 |
-| `year`    | number | No       | Lọc theo năm                   |
-| `status`  | string | No       | `draft`, `published`, `closed` |
-| `page`    | number | No       | Trang hiện tại                 |
-| `limit`   | number | No       | Số item mỗi trang              |
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `month` | number | No | Lọc theo tháng |
+| `year` | number | No | Lọc theo năm |
+| `status` | string | No | `draft`, `active`, `closed` |
+| `pageNumber` | number | No | Trang hiện tại |
+| `pageSize` | number | No | Số item mỗi trang |
 
 ### Success Response — `200 OK`
 
 ```json
 {
   "success": true,
+  "statusCode": 200,
+  "message": "Fee periods retrieved successfully",
   "data": [
     {
       "id": "fee-period-2026-06",
@@ -808,23 +889,27 @@ GET /fee-periods
       "startDate": "2026-06-01",
       "endDate": "2026-06-30",
       "dueDate": "2026-07-10",
-      "status": "published"
+      "status": "active"
     }
   ],
   "pagination": {
-    "page": 1,
-    "limit": 10,
-    "total": 1
-  }
+    "pageNumber": 1,
+    "pageSize": 20,
+    "totalRecords": 1,
+    "totalPages": 1,
+    "hasNextPage": false,
+    "hasPreviousPage": false
+  },
+  "timestamp": "2026-05-31T10:30:45.123Z"
 }
 ```
 
 ---
 
-## 6.2. Create Fee Period
+## 7.2. Create Fee Period
 
 ```http
-POST /fee-periods
+POST /api/fee-periods
 ```
 
 ### Request Body
@@ -859,20 +944,21 @@ POST /fee-periods
 
 ### Validation Rules
 
-| Rule                                                        |
-| ----------------------------------------------------------- |
-| Không được tạo hai kỳ phí trùng `month` và `year`           |
-| `startDate` phải nhỏ hơn hoặc bằng `endDate`                |
-| `dueDate` không được trước `endDate`                        |
-| Mỗi `feeTypeId` chỉ được xuất hiện một lần trong một kỳ phí |
-| `priceHistoryId` phải thuộc đúng `feeTypeId`                |
-| Price version phải có hiệu lực trong thời gian của kỳ phí   |
+| Rule |
+| --- |
+| Không được tạo hai kỳ phí trùng `month` và `year` |
+| `startDate` phải nhỏ hơn hoặc bằng `endDate` |
+| `dueDate` không được trước `endDate` |
+| Mỗi `feeTypeId` chỉ xuất hiện một lần trong một kỳ phí |
+| `priceHistoryId` phải thuộc đúng `feeTypeId` |
+| Version giá phải có hiệu lực trong khoảng thời gian kỳ phí |
 
 ### Success Response — `201 Created`
 
 ```json
 {
   "success": true,
+  "statusCode": 201,
   "message": "Fee period created successfully",
   "data": {
     "id": "fee-period-2026-06",
@@ -880,36 +966,36 @@ POST /fee-periods
     "month": 6,
     "year": 2026,
     "status": "draft"
-  }
+  },
+  "timestamp": "2026-05-31T10:30:45.123Z"
 }
 ```
 
 ---
 
-## 6.3. Get Fee Period Detail — Integration Endpoint for Module 4
-
-Endpoint này là endpoint trọng tâm để Module 4 tạo hóa đơn tự động.
+## 7.3. Get Fee Period Detail — Integration Endpoint for Module 4
 
 ```http
-GET /fee-periods/:id
+GET /api/fee-periods/:id
 ```
 
-### Required Response Information for Module 4
+### Required Data for Module 4
 
-Response phải bao gồm:
+Response bao gồm:
 
-* Thông tin kỳ thu phí.
-* Danh sách toàn bộ loại phí áp dụng trong kỳ.
-* `calculationType` của từng loại phí.
-* Đơn giá chính xác tại kỳ phí đó.
-* `priceHistoryId` để đảm bảo versioning.
-* Cờ `isRequired` để phân biệt phí bắt buộc và phí tự nguyện.
+- Thông tin kỳ thu phí.
+- Danh sách `feeItems` áp dụng trong kỳ.
+- `calculationType` và `unit` của từng loại phí.
+- `priceHistoryId` và chi tiết version đơn giá.
+- Cờ `isRequired` để phân biệt phí bắt buộc và đóng góp tự nguyện.
 
 ### Success Response — `200 OK`
 
 ```json
 {
   "success": true,
+  "statusCode": 200,
+  "message": "Fee period retrieved successfully",
   "data": {
     "id": "fee-period-2026-06",
     "name": "Phí tháng 06/2026",
@@ -918,10 +1004,11 @@ Response phải bao gồm:
     "startDate": "2026-06-01",
     "endDate": "2026-06-30",
     "dueDate": "2026-07-10",
-    "status": "published",
+    "status": "active",
     "feeItems": [
       {
-        "id": "fee-period-item-001",
+        "id": "fee-period-fee-type-001",
+        "priceHistoryId": "price-history-002",
         "feeType": {
           "id": "fee-type-001",
           "code": "MANAGEMENT_FEE",
@@ -931,31 +1018,33 @@ Response phải bao gồm:
         },
         "priceVersion": {
           "id": "price-history-002",
-          "unitPrice": 9000,
+          "unitPrice": "9000.00",
           "effectiveFrom": "2026-06-01",
           "effectiveTo": null
         },
         "isRequired": true
       },
       {
-        "id": "fee-period-item-002",
+        "id": "fee-period-fee-type-002",
+        "priceHistoryId": "price-history-010",
         "feeType": {
           "id": "fee-type-002",
-          "code": "PARKING_FEE",
-          "name": "Phí gửi xe",
+          "code": "SERVICE_FEE",
+          "name": "Phí dịch vụ",
           "calculationType": "fixed",
           "unit": "VND/household"
         },
         "priceVersion": {
           "id": "price-history-010",
-          "unitPrice": 100000,
+          "unitPrice": "100000.00",
           "effectiveFrom": "2026-01-01",
           "effectiveTo": null
         },
         "isRequired": true
       },
       {
-        "id": "fee-period-item-003",
+        "id": "fee-period-fee-type-003",
+        "priceHistoryId": "price-history-015",
         "feeType": {
           "id": "fee-type-003",
           "code": "CHARITY_FUND",
@@ -965,35 +1054,36 @@ Response phải bao gồm:
         },
         "priceVersion": {
           "id": "price-history-015",
-          "unitPrice": 0,
+          "unitPrice": "0.00",
           "effectiveFrom": "2026-01-01",
           "effectiveTo": null
         },
         "isRequired": false
       }
     ]
-  }
+  },
+  "timestamp": "2026-05-31T10:30:45.123Z"
 }
 ```
 
 ### Example Calculation Used by Module 4
 
-Với căn hộ có diện tích `70 m²`:
+Với hộ dân có diện tích tính phí là `70 m²`:
 
-| Fee Type     | Calculation        | Amount                 |
-| ------------ | ------------------ | ---------------------- |
-| Phí quản lý  | `9000 × 70`        | `630000 VND`           |
-| Phí gửi xe   | `100000`           | `100000 VND`           |
-| Quỹ từ thiện | Do cư dân lựa chọn | Không tự động bắt buộc |
+| Fee Type | Calculation | Amount |
+| --- | --- | --- |
+| Phí quản lý | `9000.00 × 70` | `630000.00 VND` |
+| Phí dịch vụ | `100000.00` | `100000.00 VND` |
+| Quỹ từ thiện | Cư dân lựa chọn | Không tự động cộng |
 
 ---
 
-## 6.4. Update Draft Fee Period
+## 7.4. Update Draft Fee Period
 
-Chỉ cho phép sửa kỳ phí khi trạng thái là `draft`.
+Chỉ cho phép sửa kỳ phí ở trạng thái `draft`.
 
 ```http
-PATCH /fee-periods/:id
+PATCH /api/fee-periods/:id
 ```
 
 ### Request Body
@@ -1016,41 +1106,24 @@ PATCH /fee-periods/:id
 ```json
 {
   "success": true,
-  "message": "Fee period updated successfully"
-}
-```
-
----
-
-## 6.5. Publish Fee Period
-
-Sau khi một kỳ phí được publish, thông tin cấu hình phí và version giá của kỳ đó không được thay đổi.
-
-```http
-POST /fee-periods/:id/publish
-```
-
-### Success Response — `200 OK`
-
-```json
-{
-  "success": true,
-  "message": "Fee period published successfully",
+  "statusCode": 200,
+  "message": "Fee period updated successfully",
   "data": {
     "id": "fee-period-2026-06",
-    "status": "published"
-  }
+    "status": "draft"
+  },
+  "timestamp": "2026-05-31T10:30:45.123Z"
 }
 ```
 
 ---
 
-## 6.6. Delete Draft Fee Period
+## 7.5. Activate Fee Period
 
-Chỉ cho phép xóa kỳ phí khi trạng thái là `draft`.
+Sau khi kỳ phí chuyển sang `active`, danh sách phí và version giá đã chốt không được thay đổi.
 
 ```http
-DELETE /fee-periods/:id
+POST /api/fee-periods/:id/activate
 ```
 
 ### Success Response — `200 OK`
@@ -1058,59 +1131,102 @@ DELETE /fee-periods/:id
 ```json
 {
   "success": true,
-  "message": "Draft fee period deleted successfully"
+  "statusCode": 200,
+  "message": "Fee period activated successfully",
+  "data": {
+    "id": "fee-period-2026-06",
+    "status": "active"
+  },
+  "timestamp": "2026-05-31T10:30:45.123Z"
 }
 ```
 
 ---
 
-# 7. Utility Invoices API
+## 7.6. Delete Draft Fee Period
 
-> `utility-invoices` trong Module 3 lưu dữ liệu phí tiện ích đầu vào theo căn hộ và kỳ phí. Module 4 sử dụng dữ liệu này để tổng hợp vào hóa đơn cuối cùng của cư dân.
-
-## 7.1. Get Utility Invoices
+Chỉ cho phép xóa kỳ phí ở trạng thái `draft`.
 
 ```http
-GET /utility-invoices
+DELETE /api/fee-periods/:id
+```
+
+### Success Response — `200 OK`
+
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "message": "Draft fee period deleted successfully",
+  "data": {
+    "id": "fee-period-2026-06"
+  },
+  "timestamp": "2026-05-31T10:30:45.123Z"
+}
+```
+
+---
+
+# 8. Utility Invoices API
+
+> `utility_invoices` lưu dữ liệu phí tiện ích đầu vào theo hộ dân và kỳ phí. Module 4 sử dụng các bản ghi `confirmed` để tổng hợp hóa đơn cuối cùng.
+
+## 8.1. Get Utility Invoices
+
+```http
+GET /api/utility-invoices
 ```
 
 ### Query Parameters
 
-| Parameter     | Type   | Required | Description                                 |
-| ------------- | ------ | -------- | ------------------------------------------- |
-| `feePeriodId` | UUID   | No       | Lọc theo kỳ phí                             |
-| `apartmentId` | UUID   | No       | Lọc theo căn hộ                             |
-| `utilityType` | string | No       | `water`, `electricity`, `internet`, `other` |
-| `status`      | string | No       | `draft`, `confirmed`                        |
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `feePeriodId` | UUID | No | Lọc theo kỳ phí |
+| `householdId` | UUID | No | Lọc theo hộ dân |
+| `utilityType` | string | No | `electricity`, `water`, `internet` |
+| `status` | string | No | `draft`, `confirmed` |
+| `pageNumber` | number | No | Trang hiện tại |
+| `pageSize` | number | No | Số item mỗi trang |
 
 ### Success Response — `200 OK`
 
 ```json
 {
   "success": true,
+  "statusCode": 200,
+  "message": "Utility invoices retrieved successfully",
   "data": [
     {
       "id": "utility-invoice-001",
       "feePeriodId": "fee-period-2026-06",
-      "apartmentId": "apartment-A101",
+      "householdId": "household-A101",
       "utilityType": "water",
-      "previousReading": 120,
-      "currentReading": 132,
-      "usageAmount": 12,
-      "unitPrice": 15000,
-      "totalAmount": 180000,
+      "previousReading": "120.00",
+      "currentReading": "132.00",
+      "usageAmount": "12.00",
+      "unitPrice": "15000.00",
+      "totalAmount": "180000.00",
       "status": "confirmed"
     }
-  ]
+  ],
+  "pagination": {
+    "pageNumber": 1,
+    "pageSize": 20,
+    "totalRecords": 1,
+    "totalPages": 1,
+    "hasNextPage": false,
+    "hasPreviousPage": false
+  },
+  "timestamp": "2026-05-31T10:30:45.123Z"
 }
 ```
 
 ---
 
-## 7.2. Create Utility Invoice
+## 8.2. Create Utility Invoice
 
 ```http
-POST /utility-invoices
+POST /api/utility-invoices
 ```
 
 ### Request Body
@@ -1118,60 +1234,62 @@ POST /utility-invoices
 ```json
 {
   "feePeriodId": "fee-period-2026-06",
-  "apartmentId": "apartment-A101",
+  "householdId": "household-A101",
   "utilityType": "water",
-  "previousReading": 120,
-  "currentReading": 132,
-  "unitPrice": 15000
+  "previousReading": "120.00",
+  "currentReading": "132.00",
+  "unitPrice": "15000.00"
 }
 ```
 
 ### Processing Rule
-
-Hệ thống tự động tính:
 
 ```txt
 usageAmount = currentReading - previousReading
 totalAmount = usageAmount × unitPrice
 ```
 
+Các phép tính tiền phải dùng decimal arithmetic.
+
 ### Success Response — `201 Created`
 
 ```json
 {
   "success": true,
+  "statusCode": 201,
   "message": "Utility invoice created successfully",
   "data": {
     "id": "utility-invoice-001",
     "feePeriodId": "fee-period-2026-06",
-    "apartmentId": "apartment-A101",
+    "householdId": "household-A101",
     "utilityType": "water",
-    "previousReading": 120,
-    "currentReading": 132,
-    "usageAmount": 12,
-    "unitPrice": 15000,
-    "totalAmount": 180000,
+    "previousReading": "120.00",
+    "currentReading": "132.00",
+    "usageAmount": "12.00",
+    "unitPrice": "15000.00",
+    "totalAmount": "180000.00",
     "status": "draft"
-  }
+  },
+  "timestamp": "2026-05-31T10:30:45.123Z"
 }
 ```
 
 ---
 
-## 7.3. Update Utility Invoice
+## 8.3. Update Utility Invoice
 
-Chỉ cho phép sửa utility invoice khi trạng thái là `draft`.
+Chỉ cho phép sửa utility invoice ở trạng thái `draft`.
 
 ```http
-PATCH /utility-invoices/:id
+PATCH /api/utility-invoices/:id
 ```
 
 ### Request Body
 
 ```json
 {
-  "currentReading": 134,
-  "unitPrice": 15000
+  "currentReading": "134.00",
+  "unitPrice": "15000.00"
 }
 ```
 
@@ -1180,24 +1298,26 @@ PATCH /utility-invoices/:id
 ```json
 {
   "success": true,
+  "statusCode": 200,
   "message": "Utility invoice updated successfully",
   "data": {
     "id": "utility-invoice-001",
-    "usageAmount": 14,
-    "totalAmount": 210000,
+    "usageAmount": "14.00",
+    "totalAmount": "210000.00",
     "status": "draft"
-  }
+  },
+  "timestamp": "2026-05-31T10:30:45.123Z"
 }
 ```
 
 ---
 
-## 7.4. Confirm Utility Invoice
+## 8.4. Confirm Utility Invoice
 
-Sau khi confirmed, dữ liệu tiện ích không được sửa để Module 4 sử dụng khi generate hóa đơn.
+Sau khi chuyển sang `confirmed`, dữ liệu tiện ích không được sửa để Module 4 sử dụng khi tạo hóa đơn.
 
 ```http
-POST /utility-invoices/:id/confirm
+POST /api/utility-invoices/:id/confirm
 ```
 
 ### Success Response — `200 OK`
@@ -1205,22 +1325,24 @@ POST /utility-invoices/:id/confirm
 ```json
 {
   "success": true,
+  "statusCode": 200,
   "message": "Utility invoice confirmed successfully",
   "data": {
     "id": "utility-invoice-001",
     "status": "confirmed"
-  }
+  },
+  "timestamp": "2026-05-31T10:30:45.123Z"
 }
 ```
 
 ---
 
-## 7.5. Delete Utility Invoice
+## 8.5. Delete Utility Invoice
 
 Chỉ cho phép xóa utility invoice ở trạng thái `draft`.
 
 ```http
-DELETE /utility-invoices/:id
+DELETE /api/utility-invoices/:id
 ```
 
 ### Success Response — `200 OK`
@@ -1228,178 +1350,209 @@ DELETE /utility-invoices/:id
 ```json
 {
   "success": true,
-  "message": "Draft utility invoice deleted successfully"
+  "statusCode": 200,
+  "message": "Draft utility invoice deleted successfully",
+  "data": {
+    "id": "utility-invoice-001"
+  },
+  "timestamp": "2026-05-31T10:30:45.123Z"
 }
 ```
 
 ---
 
-# 8. Error Codes
+# 9. Module 3 Error Codes
 
-## 8.1. Standard Error Response Format
+Các lỗi Module 3 dùng format lỗi chung ở mục 4 của phần này.
 
-```json
-{
-  "success": false,
-  "error": {
-    "code": "FEE_TYPE_NOT_FOUND",
-    "message": "Fee type not found",
-    "details": null
-  }
-}
-```
-
-## 8.2. Common Errors
-
-| HTTP Status | Error Code                                    | Description                                |
-| ----------- | --------------------------------------------- | ------------------------------------------ |
-| `400`       | `VALIDATION_ERROR`                            | Dữ liệu request không hợp lệ               |
-| `401`       | `UNAUTHORIZED`                                | Token không tồn tại hoặc không hợp lệ      |
-| `403`       | `FORBIDDEN`                                   | Không có quyền thực hiện thao tác          |
-| `404`       | `FEE_TYPE_NOT_FOUND`                          | Không tìm thấy loại phí                    |
-| `404`       | `PRICE_HISTORY_NOT_FOUND`                     | Không tìm thấy phiên bản giá               |
-| `404`       | `FEE_PERIOD_NOT_FOUND`                        | Không tìm thấy kỳ phí                      |
-| `404`       | `UTILITY_INVOICE_NOT_FOUND`                   | Không tìm thấy dữ liệu tiện ích            |
-| `409`       | `FEE_TYPE_CODE_ALREADY_EXISTS`                | Mã loại phí đã tồn tại                     |
-| `409`       | `FEE_PERIOD_ALREADY_EXISTS`                   | Kỳ phí của tháng và năm này đã tồn tại     |
-| `409`       | `PRICE_VERSION_OVERLAP`                       | Khoảng hiệu lực của phiên bản giá bị trùng |
-| `409`       | `PUBLISHED_FEE_PERIOD_CANNOT_BE_UPDATED`      | Không thể sửa kỳ phí đã publish            |
-| `409`       | `CONFIRMED_UTILITY_INVOICE_CANNOT_BE_UPDATED` | Không thể sửa dữ liệu tiện ích đã xác nhận |
+| HTTP Status | Error Code | Description |
+| --- | --- | --- |
+| `400` | `VALIDATION_ERROR` | Dữ liệu request không hợp lệ |
+| `401` | `UNAUTHORIZED` | Token không tồn tại, không hợp lệ hoặc hết hạn |
+| `403` | `FORBIDDEN` | Người dùng không có quyền thực hiện thao tác |
+| `404` | `FEE_TYPE_NOT_FOUND` | Không tìm thấy loại phí |
+| `404` | `PRICE_HISTORY_NOT_FOUND` | Không tìm thấy version giá |
+| `404` | `FEE_PERIOD_NOT_FOUND` | Không tìm thấy kỳ phí |
+| `404` | `UTILITY_INVOICE_NOT_FOUND` | Không tìm thấy dữ liệu tiện ích |
+| `409` | `FEE_TYPE_CODE_ALREADY_EXISTS` | Mã loại phí đã tồn tại |
+| `409` | `FEE_PERIOD_ALREADY_EXISTS` | Kỳ phí của tháng và năm này đã tồn tại |
+| `409` | `PRICE_VERSION_OVERLAP` | Khoảng hiệu lực của version giá bị trùng |
+| `409` | `ACTIVE_FEE_PERIOD_CANNOT_BE_UPDATED` | Không thể sửa kỳ phí đang `active` |
+| `409` | `CONFIRMED_UTILITY_INVOICE_CANNOT_BE_UPDATED` | Không thể sửa dữ liệu tiện ích đã `confirmed` |
 
 ---
 
-# 9. Suggested Database Schema
+# 10. Database Schema Implemented in Sprint 1
 
-## 9.1. Table: `fee_types`
+## 10.1. Table: `fee_types`
 
-| Column             | Type      | Constraints                    |
-| ------------------ | --------- | ------------------------------ |
-| `id`               | UUID      | Primary Key                    |
-| `name`             | VARCHAR   | NOT NULL                       |
-| `code`             | VARCHAR   | UNIQUE, NOT NULL               |
-| `description`      | TEXT      | Nullable                       |
-| `calculation_type` | ENUM      | `per_m2`, `fixed`, `voluntary` |
-| `unit`             | VARCHAR   | NOT NULL                       |
-| `is_active`        | BOOLEAN   | DEFAULT `true`                 |
-| `created_at`       | TIMESTAMP | NOT NULL                       |
-| `updated_at`       | TIMESTAMP | NOT NULL                       |
+| Column | Type | Constraints |
+| --- | --- | --- |
+| `id` | UUID / `CHAR(36)` | Primary Key |
+| `name` | `VARCHAR(100)` | NOT NULL |
+| `code` | `VARCHAR(50)` | UNIQUE, NOT NULL |
+| `description` | TEXT | Nullable |
+| `calculation_type` | ENUM | `per_m2`, `fixed`, `voluntary`; NOT NULL |
+| `unit` | `VARCHAR(30)` | NOT NULL |
+| `is_active` | BOOLEAN | NOT NULL, DEFAULT `true` |
+| `created_at` | DATETIME | NOT NULL, DEFAULT current timestamp |
+| `updated_at` | DATETIME | NOT NULL, DEFAULT current timestamp |
 
-## 9.2. Table: `fee_type_price_history`
+## 10.2. Table: `fee_type_price_history`
 
-| Column           | Type      | Constraints                  |
-| ---------------- | --------- | ---------------------------- |
-| `id`             | UUID      | Primary Key                  |
-| `fee_type_id`    | UUID      | Foreign Key → `fee_types.id` |
-| `unit_price`     | DECIMAL   | NOT NULL, `>= 0`             |
-| `effective_from` | DATE      | NOT NULL                     |
-| `effective_to`   | DATE      | Nullable                     |
-| `created_by`     | UUID      | Foreign Key → user/admin     |
-| `created_at`     | TIMESTAMP | NOT NULL                     |
+| Column | Type | Constraints |
+| --- | --- | --- |
+| `id` | UUID / `CHAR(36)` | Primary Key |
+| `fee_type_id` | UUID / `CHAR(36)` | Foreign Key → `fee_types.id`, NOT NULL |
+| `unit_price` | `DECIMAL(15,2)` | NOT NULL |
+| `effective_from` | DATE | NOT NULL |
+| `effective_to` | DATE | Nullable |
+| `created_by` | UUID / `CHAR(36)` | Nullable in Sprint 1; FK pending Module 1 |
+| `created_at` | DATETIME | NOT NULL, DEFAULT current timestamp |
+| `updated_at` | DATETIME | NOT NULL, DEFAULT current timestamp |
 
-## 9.3. Table: `fee_periods`
+**Indexes / Relationships:**
 
-| Column       | Type      | Constraints                    |
-| ------------ | --------- | ------------------------------ |
-| `id`         | UUID      | Primary Key                    |
-| `name`       | VARCHAR   | NOT NULL                       |
-| `month`      | INTEGER   | NOT NULL                       |
-| `year`       | INTEGER   | NOT NULL                       |
-| `start_date` | DATE      | NOT NULL                       |
-| `end_date`   | DATE      | NOT NULL                       |
-| `due_date`   | DATE      | NOT NULL                       |
-| `status`     | ENUM      | `draft`, `published`, `closed` |
-| `created_at` | TIMESTAMP | NOT NULL                       |
-| `updated_at` | TIMESTAMP | NOT NULL                       |
+```txt
+INDEX(fee_type_id)
+UNIQUE(fee_type_id, effective_from)
+ON DELETE fee_types → RESTRICT
+```
 
-**Constraint:**
+## 10.3. Table: `fee_periods`
+
+| Column | Type | Constraints |
+| --- | --- | --- |
+| `id` | UUID / `CHAR(36)` | Primary Key |
+| `name` | `VARCHAR(100)` | NOT NULL |
+| `month` | INTEGER | NOT NULL |
+| `year` | INTEGER | NOT NULL |
+| `start_date` | DATE | NOT NULL |
+| `end_date` | DATE | NOT NULL |
+| `due_date` | DATE | NOT NULL |
+| `status` | ENUM | `draft`, `active`, `closed`; DEFAULT `draft` |
+| `created_at` | DATETIME | NOT NULL, DEFAULT current timestamp |
+| `updated_at` | DATETIME | NOT NULL, DEFAULT current timestamp |
+
+**Indexes:**
 
 ```txt
 UNIQUE(month, year)
+INDEX(status)
 ```
 
-## 9.4. Table: `fee_period_items`
+## 10.4. Table: `fee_period_fee_types`
 
-| Column             | Type    | Constraints                               |
-| ------------------ | ------- | ----------------------------------------- |
-| `id`               | UUID    | Primary Key                               |
-| `fee_period_id`    | UUID    | Foreign Key → `fee_periods.id`            |
-| `fee_type_id`      | UUID    | Foreign Key → `fee_types.id`              |
-| `price_history_id` | UUID    | Foreign Key → `fee_type_price_history.id` |
-| `is_required`      | BOOLEAN | NOT NULL                                  |
+| Column | Type | Constraints |
+| --- | --- | --- |
+| `id` | UUID / `CHAR(36)` | Primary Key |
+| `fee_period_id` | UUID / `CHAR(36)` | Foreign Key → `fee_periods.id`, NOT NULL |
+| `fee_type_id` | UUID / `CHAR(36)` | Foreign Key → `fee_types.id`, NOT NULL |
+| `price_history_id` | UUID / `CHAR(36)` | Foreign Key → `fee_type_price_history.id`, NOT NULL |
+| `is_required` | BOOLEAN | NOT NULL, DEFAULT `true` |
+| `created_at` | DATETIME | NOT NULL, DEFAULT current timestamp |
+| `updated_at` | DATETIME | NOT NULL, DEFAULT current timestamp |
 
-**Constraint:**
+**Indexes / Relationships:**
 
 ```txt
 UNIQUE(fee_period_id, fee_type_id)
+INDEX(price_history_id)
+ON DELETE fee_periods → CASCADE
+ON DELETE fee_types → RESTRICT
+ON DELETE fee_type_price_history → RESTRICT
 ```
 
-## 9.5. Table: `utility_invoices`
+## 10.5. Table: `utility_invoices`
 
-| Column             | Type      | Constraints                                 |
-| ------------------ | --------- | ------------------------------------------- |
-| `id`               | UUID      | Primary Key                                 |
-| `fee_period_id`    | UUID      | Foreign Key → `fee_periods.id`              |
-| `apartment_id`     | UUID      | Foreign Key → apartment                     |
-| `utility_type`     | ENUM      | `water`, `electricity`, `internet`, `other` |
-| `previous_reading` | DECIMAL   | Nullable                                    |
-| `current_reading`  | DECIMAL   | Nullable                                    |
-| `usage_amount`     | DECIMAL   | NOT NULL                                    |
-| `unit_price`       | DECIMAL   | NOT NULL                                    |
-| `total_amount`     | DECIMAL   | NOT NULL                                    |
-| `status`           | ENUM      | `draft`, `confirmed`                        |
-| `created_at`       | TIMESTAMP | NOT NULL                                    |
-| `updated_at`       | TIMESTAMP | NOT NULL                                    |
+| Column | Type | Constraints |
+| --- | --- | --- |
+| `id` | UUID / `CHAR(36)` | Primary Key |
+| `fee_period_id` | UUID / `CHAR(36)` | Foreign Key → `fee_periods.id`, NOT NULL |
+| `household_id` | UUID / `CHAR(36)` | NOT NULL; FK pending Module 2 |
+| `utility_type` | ENUM | `electricity`, `water`, `internet`; NOT NULL |
+| `previous_reading` | `DECIMAL(15,2)` | Nullable |
+| `current_reading` | `DECIMAL(15,2)` | Nullable |
+| `usage_amount` | `DECIMAL(15,2)` | NOT NULL |
+| `unit_price` | `DECIMAL(15,2)` | NOT NULL |
+| `total_amount` | `DECIMAL(15,2)` | NOT NULL |
+| `status` | ENUM | `draft`, `confirmed`; DEFAULT `draft` |
+| `created_at` | DATETIME | NOT NULL, DEFAULT current timestamp |
+| `updated_at` | DATETIME | NOT NULL, DEFAULT current timestamp |
 
----
-
-# 10. Module 3 Endpoint Summary
-
-| Method   | Endpoint                        | Purpose                              |
-| -------- | ------------------------------- | ------------------------------------ |
-| `GET`    | `/fee-types`                    | Lấy danh sách loại phí               |
-| `POST`   | `/fee-types`                    | Tạo loại phí mới                     |
-| `GET`    | `/fee-types/:id`                | Lấy chi tiết loại phí                |
-| `PATCH`  | `/fee-types/:id`                | Cập nhật thông tin loại phí          |
-| `DELETE` | `/fee-types/:id`                | Ngừng sử dụng loại phí               |
-| `GET`    | `/fee-types/:id/price-history`  | Lấy lịch sử đơn giá                  |
-| `POST`   | `/fee-types/:id/price-history`  | Tạo phiên bản giá mới                |
-| `GET`    | `/fee-periods`                  | Lấy danh sách kỳ phí                 |
-| `POST`   | `/fee-periods`                  | Tạo kỳ phí                           |
-| `GET`    | `/fee-periods/:id`              | Lấy cấu hình kỳ phí phục vụ Module 4 |
-| `PATCH`  | `/fee-periods/:id`              | Cập nhật kỳ phí nháp                 |
-| `POST`   | `/fee-periods/:id/publish`      | Publish kỳ phí                       |
-| `DELETE` | `/fee-periods/:id`              | Xóa kỳ phí nháp                      |
-| `GET`    | `/utility-invoices`             | Lấy danh sách phí tiện ích           |
-| `POST`   | `/utility-invoices`             | Tạo phí tiện ích                     |
-| `PATCH`  | `/utility-invoices/:id`         | Cập nhật phí tiện ích nháp           |
-| `POST`   | `/utility-invoices/:id/confirm` | Xác nhận phí tiện ích                |
-| `DELETE` | `/utility-invoices/:id`         | Xóa phí tiện ích nháp                |
-
----
-
-# 11. Integration Note for Module 4
-
-Module 4 cần gọi:
-
-```http
-GET /fee-periods/:id
-```
-
-Module 3 cam kết endpoint này trả về:
-
-1. Thông tin kỳ thu phí.
-2. Danh sách các loại phí áp dụng.
-3. Cách tính phí của từng loại: `per_m2`, `fixed`, `voluntary`.
-4. Đơn giá đã được versioning tại thời điểm kỳ phí được publish.
-5. `priceHistoryId` để hóa đơn giữ nguyên dữ liệu lịch sử.
-6. Cờ `isRequired` để Module 4 không tự động bắt buộc các khoản đóng góp tự nguyện.
-
-Module 4 có thể sử dụng response này để tính:
+**Indexes / Relationships:**
 
 ```txt
-per_m2 amount = apartment area × unit price
-fixed amount = unit price
+INDEX(fee_period_id)
+INDEX(household_id)
+UNIQUE(fee_period_id, household_id, utility_type)
+ON DELETE fee_periods → CASCADE
+```
+
+---
+
+# 11. Module 3 Endpoint Summary
+
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/fee-types` | Lấy danh sách loại phí |
+| `POST` | `/api/fee-types` | Tạo loại phí mới |
+| `GET` | `/api/fee-types/:id` | Lấy chi tiết loại phí |
+| `PATCH` | `/api/fee-types/:id` | Cập nhật metadata loại phí |
+| `DELETE` | `/api/fee-types/:id` | Ngừng sử dụng loại phí |
+| `GET` | `/api/fee-types/:id/price-history` | Lấy lịch sử đơn giá |
+| `POST` | `/api/fee-types/:id/price-history` | Tạo version giá mới |
+| `GET` | `/api/fee-periods` | Lấy danh sách kỳ phí |
+| `POST` | `/api/fee-periods` | Tạo kỳ phí |
+| `GET` | `/api/fee-periods/:id` | Lấy cấu hình kỳ phí phục vụ Module 4 |
+| `PATCH` | `/api/fee-periods/:id` | Cập nhật kỳ phí nháp |
+| `POST` | `/api/fee-periods/:id/activate` | Kích hoạt kỳ phí |
+| `DELETE` | `/api/fee-periods/:id` | Xóa kỳ phí nháp |
+| `GET` | `/api/utility-invoices` | Lấy danh sách phí tiện ích |
+| `POST` | `/api/utility-invoices` | Tạo phí tiện ích |
+| `PATCH` | `/api/utility-invoices/:id` | Cập nhật phí tiện ích nháp |
+| `POST` | `/api/utility-invoices/:id/confirm` | Xác nhận phí tiện ích |
+| `DELETE` | `/api/utility-invoices/:id` | Xóa phí tiện ích nháp |
+
+---
+
+# 12. Integration Note for Module 4
+
+Module 4 gọi:
+
+```http
+GET /api/fee-periods/:id
+```
+
+Module 3 cam kết response contract cung cấp:
+
+1. Thông tin kỳ phí và trạng thái `active`.
+2. Danh sách `feeItems`.
+3. `calculationType`: `per_m2`, `fixed`, `voluntary`.
+4. `unitPrice` dưới dạng decimal string.
+5. `priceHistoryId` cùng chi tiết `priceVersion`, bảo toàn lịch sử giá.
+6. `isRequired` để không tự động bắt buộc khoản đóng góp tự nguyện.
+
+Cách tính dự kiến phía Module 4:
+
+```txt
+per_m2 amount = Decimal(unitPrice) × Decimal(area)
+fixed amount = Decimal(unitPrice)
 voluntary amount = resident-selected amount, nếu có
 ```
 
-Khi kỳ phí đã ở trạng thái `published`, Module 3 không cho phép thay đổi `feeItems` hoặc `priceHistoryId` của kỳ đó.
+Khi kỳ phí đã ở trạng thái `active`, Module 3 không cho phép thay đổi `feeItems` hoặc `priceHistoryId`.
+
+> **Coordination Pending:** Chinh (Module 4) cần xác nhận response format trên đủ để thực hiện generate hóa đơn tự động.
+
+---
+
+# 13. Sprint 1 Implementation Status
+
+| Requirement | Status | Note |
+| --- | --- | --- |
+| 05 Sequelize migrations chạy thành công | Completed | Đã tạo và verify trên MySQL local |
+| `decimal.js` được áp dụng vào helper tính phí | Completed | `calculateFee` và unit tests đã pass |
+| Route skeleton cho Module 3 | Completed | Đã test các route GET chính tại `/api/...` |
+| Middleware `authenticate` | Pending Module 1 | `src/middleware/authenticate.js` hiện vẫn là placeholder |
+| Response format với Module 4 | Pending confirmation | Chờ Chinh xác nhận endpoint `GET /api/fee-periods/:id` |
