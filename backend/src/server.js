@@ -18,7 +18,7 @@ app.get('/api/health', (req, res) => {
 // 3. API Routes - Kết hợp từ cấu trúc develop
 app.use('/api/auth', require('./routes/auth.routes'));
 app.use('/api/households', require('./routes/households.routes'));
-app.use('/api/fees', require('./routes/fees.routes'));
+app.use('/api', require('./routes/fees.routes'));
 app.use('/api/billing', require('./routes/billing.routes'));
 app.use('/api/dashboard', require('./routes/dashboard.routes'));
 
