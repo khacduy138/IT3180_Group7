@@ -12,7 +12,7 @@ app.use(express.json());
 
 // 2. Health check route
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', message: 'API ngon' });
+  res.json({ status: 'OK'});
 });
 
 // 3. API Routes - Kết hợp từ cấu trúc develop

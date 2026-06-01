@@ -1,0 +1,230 @@
+import { useState } from 'react';
+import { Button } from '../components/ui/Button';
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '../components/ui/Accordion';
+import { Form, FormItem, FormLabel, FormField, FormControl, FormMessage } from '../components/ui/Form';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/Tabs';
+import { Input } from '../components/ui/Input';
+import { Select } from '../components/ui/Select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/Table';
+import { Card, CardHeader, CardTitle, CardValue, CardBody, CardFooter } from '../components/ui/Card';
+import { Modal, ModalHeader, ModalBody, ModalFooter } from '../components/ui/Modal';
+import { Toast } from '../components/ui/Toast';
+import { Tag } from '../components/ui/Tag';
+import Sidebar from '../components/ui/Sidebar';
+import { useForm } from 'react-hook-form';
+import TopBar from '../components/ui/TopBar';
+import { Home } from 'lucide-react';
+
+export default function UISample() {
+  const [open, setOpen] = useState(false);
+  const [toast, setToast] = useState({ open: false, variant: 'success', title: '', description: '' });
+
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  const showToast = (variant, title, description) => {
+    setToast({ open: true, variant, title, description });
+  };
+
+  const form = useForm({
+    defaultValues: {
+      username: '',
+      email: '',
+      role: 'resident',
+    },
+  });
+
+  return (
+    <div>
+      <TopBar onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} sidebarOpen={sidebarOpen} />
+
+      <div className="flex flex-1 items-start">
+        <Sidebar open={sidebarOpen}/>
+        <main className="flex-1 p-8 overflow-x-hidden">
+        <div className="max-w-2xl mx-auto">
+          <h1 className="text-3xl font-bold text-primary mb-2">BlueMoon AMS</h1>
+          <p className="text-lg text-muted-foreground mb-8">Apartment Management System</p>
+          <div className="flex flex-col flex-wrap gap-4">
+            <Button variant="default">Test Button</Button>
+            <Button variant="outline">Outline Button</Button>
+            <Button variant="with-icon">Button with Icon <Home /></Button>
+
+            <div className="rounded-lg border border-border p-4">
+              <h2 className="mb-3 text-lg font-semibold">Header</h2>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <TableRow>
+                    <TableCell>Apartment A-1203</TableCell>
+                    <TableCell>
+                      <Tag color="green">Active</Tag>
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell>Apartment B-0401</TableCell>
+                    <TableCell>
+                      <Tag color="yellow">Pending</Tag>
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell>Apartment C-0902</TableCell>
+                    <TableCell>
+                      <Tag color="red">Blocked</Tag>
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
+
+            <Button variant="default" onClick={() => setOpen(true)}>
+              Open Modal
+            </Button>
+
+            <div className="flex flex-wrap gap-2">
+              <Button variant="default" onClick={() => showToast('success', 'Success', 'Saved successfully.')}>Success Toast</Button>
+              <Button variant="outline" onClick={() => showToast('warning', 'Warning', 'Please check your input.')}>Warning Toast</Button>
+              <Button variant="destructive" onClick={() => showToast('error', 'Error', 'Something went wrong.')}>Error Toast</Button>
+            </div>
+
+            
+
+            <Modal open={open} onOpenChange={setOpen}>
+            <ModalHeader>Confirm action</ModalHeader>
+            <ModalBody>Are you sure you want to continue?</ModalBody>
+            <ModalFooter>
+                <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+                <Button variant="default" onClick={() => setOpen(false)}>Confirm</Button>
+            </ModalFooter>
+            </Modal>
+
+            <Toast
+              open={toast.open}
+              onOpenChange={(nextOpen) => setToast((current) => ({ ...current, open: nextOpen }))}
+              variant={toast.variant}
+              title={toast.title}
+              description={toast.description}
+              duration={2500}
+            />
+
+            <Tabs defaultValue="profile" className="space-y-6">
+              <TabsList>
+                <TabsTrigger value="profile">Profile Form</TabsTrigger>
+                <TabsTrigger value="asasdas">some collapsible</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="profile">
+                <div>
+                  <h2 className="text-2xl font-semibold mb-4">User Profile</h2>
+                  <p className="text-sm text-muted-foreground mb-6">To disprises of thus againsolution da we must give shuffles cast office, or with that under be, to suffer deat merit of outraveller who would fardels bear that dream: ay, to </p>
+                </div>
+                <Form {...form}>
+                  <form className="space-y-4 border border-border rounded-lg p-4" onSubmit={form.handleSubmit((data) => console.log(data))}>
+                    <FormField
+                      control={form.control}
+                      name="username"
+                      rules={{ required: 'Username is required' }}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Username</FormLabel>
+                          <FormControl>
+                            <Input placeholder="johndoe" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Email Address</FormLabel>
+                          <FormControl>
+                            <Input type="email" placeholder="..." {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="role"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Role</FormLabel>
+                          <FormControl>
+                            <Select
+                              placeholder="Choose a role"
+                              options={[
+                                { value: 'resident', label: 'Resident' },
+                                { value: 'manager', label: 'Manager' },
+                                { value: 'accountant', label: 'Accountant' },
+                              ]}
+                              value={field.value}
+                              onValueChange={field.onChange}
+                              onBlur={field.onBlur}
+                              name={field.name}
+                              className="w-32"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <Button type="submit" variant="default" className="mt-2">
+                      Save Changes
+                    </Button>
+                  </form>
+                </Form>
+                <Button variant="destructive" className="mt-4">Delete Account</Button>
+              </TabsContent>
+
+              <TabsContent value="asasdas">
+                <Accordion type="single" collapsible className="border border-border rounded-md px-4">
+                  <AccordionItem value="item-1">
+                    <AccordionTrigger variant="subtle">Subtle Styled Trigger</AccordionTrigger>
+                    <AccordionContent>Content lines go here...</AccordionContent>
+                  </AccordionItem>
+
+                  <AccordionItem value="item-2" variant="no-border">
+                    <AccordionTrigger variant="subtle">Outline Style Trigger</AccordionTrigger>
+                    <AccordionContent>Content lines go here...</AccordionContent>
+                  </AccordionItem>
+                </Accordion>
+              </TabsContent>
+            </Tabs>
+                        <div className="grid gap-4 md:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Total Residents</CardTitle>
+                  <CardValue>128</CardValue>
+                </CardHeader>
+                <CardFooter>
+                  <p className="text-sm text-muted-foreground">+12 this month</p>
+                </CardFooter>
+              </Card>
+
+              <Card size="sm">
+                <CardHeader>
+                  <CardTitle>Flexible Card</CardTitle>
+                </CardHeader>
+                <CardBody>
+                  <p className="text-sm text-muted-foreground">This card can hold any JSX content, small or large.</p>
+                </CardBody>
+              </Card>
+            </div>
+            
+          </div>
+        </div>
+        </main>
+      </div>
+    </div>
+  );
+}
