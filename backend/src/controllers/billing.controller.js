@@ -60,6 +60,7 @@ const listInvoices = async (req, res, next) => {
 
     const { rows, count } = await Invoice.findAndCountAll({
       where,
+      distinct: true,
       include: [
         {
           model: InvoiceItem,
