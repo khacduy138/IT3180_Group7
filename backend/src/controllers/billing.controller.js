@@ -50,8 +50,15 @@ const listInvoices = async (req, res, next) => {
       where.status = req.query.status;
     }
 
-    if (req.query.householdId) {
-      where.household_id = Number(req.query.householdId);
+    if (req.query.householdId !== undefined) {
+      const householdId = Number(req.query.householdId);
+      if (!Number.isFinite(householdId)) {
+        return sendError(res, 400, 'Invalid householdId', [
+          { field: 'householdId', code: 'VAL_002', message: 'householdId must be a number' },
+        ]);
+      }
+
+      where.household_id = householdId;
     }
 
     if (req.query.feePeriodId) {
