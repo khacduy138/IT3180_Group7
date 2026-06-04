@@ -1,10 +1,28 @@
-/*
- * Role model placeholder.
- *
- * Purpose:
- * - Represent RBAC roles such as admin, accountant, and staff.
- *
- * TODO:
- * - Define Sequelize model from roles table in ERD.md.
- * - Associate Role with User and Permission.
- */
+const { DataTypes } = require('sequelize');
+
+const sequelize = require('../config/database');
+
+const Role = sequelize.define(
+	'Role',
+	{
+		id: {
+			type: DataTypes.INTEGER,
+			allowNull: false,
+			autoIncrement: true,
+			primaryKey: true,
+		},
+		name: {
+			type: DataTypes.STRING,
+			allowNull: false,
+			unique: true,
+		},
+	},
+	{
+		tableName: 'roles',
+		timestamps: true,
+		createdAt: 'created_at',
+		updatedAt: 'updated_at',
+	}
+);
+
+module.exports = Role;
