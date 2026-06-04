@@ -293,13 +293,34 @@ const createPayment = async (req, res, next) => {
     const invoiceId = Number(req.params.id);
     const { amount, paymentMethod, paymentDate, note, createdBy } = req.body;
 
-    if (!invoiceId || !amount || !paymentMethod || !paymentDate || !createdBy) {
-      return sendError(res, 400, 'Missing required fields', [
-        { field: 'amount', code: 'VAL_001', message: 'amount is required' },
-        { field: 'paymentMethod', code: 'VAL_001', message: 'paymentMethod is required' },
-        { field: 'paymentDate', code: 'VAL_001', message: 'paymentDate is required' },
-        { field: 'createdBy', code: 'VAL_001', message: 'createdBy is required' },
-      ]);
+    const errors = [];
+
+    const amountNumber = Number(amount);
+    const createdById = Number(createdBy);
+    const paymentTimestamp = Date.parse(paymentDate);
+
+    if (!Number.isFinite(invoiceId) || invoiceId <= 0) {
+      errors.push({ field: 'id', code: 'VAL_002', message: 'id must be a positive integer' });
+    }
+
+    if (!Number.isFinite(amountNumber) || amountNumber <= 0) {
+      errors.push({ field: 'amount', code: 'VAL_002', message: 'amount must be a finite number > 0' });
+    }
+
+    if (!paymentMethod) {
+      errors.push({ field: 'paymentMethod', code: 'VAL_001', message: 'paymentMethod is required' });
+    }
+
+    if (!paymentDate || Number.isNaN(paymentTimestamp)) {
+      errors.push({ field: 'paymentDate', code: 'VAL_002', message: 'paymentDate must be a valid date' });
+    }
+
+    if (!Number.isInteger(createdById)) {
+      errors.push({ field: 'createdBy', code: 'VAL_002', message: 'createdBy must be an integer' });
+    }
+
+    if (errors.length) {
+      return sendError(res, 400, 'Missing or invalid required fields', errors);
     }
 
     const invoice = await Invoice.findByPk(invoiceId, {
@@ -312,11 +333,11 @@ const createPayment = async (req, res, next) => {
 
     const payment = await Payment.create({
       invoice_id: invoice.id,
-      amount: Number(amount),
+      amount: amountNumber,
       payment_method: paymentMethod,
       payment_date: paymentDate,
       note: note || null,
-      created_by: Number(createdBy),
+      created_by: createdById,
     });
 
     const totalPaid = invoice.Payments.reduce(
