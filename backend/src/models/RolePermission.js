@@ -1,9 +1,31 @@
-/*
- * RolePermission model placeholder.
- *
- * Purpose:
- * - Represent the many-to-many relationship between roles and permissions.
- *
- * TODO:
- * - Define Sequelize join model from role_permissions table in ERD.md.
- */
+const { DataTypes, Model } = require('sequelize');
+
+const sequelize = require('../config/database');
+
+class RolePermission extends Model {}
+
+RolePermission.init(
+  {
+    role_id: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      primaryKey: true,
+    },
+    permission_id: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      primaryKey: true,
+    },
+  },
+  {
+    sequelize,
+    modelName: 'RolePermission',
+    tableName: 'role_permissions',
+    timestamps: true,
+    createdAt: 'created_at',
+    updatedAt: 'updated_at',
+    underscored: true,
+  },
+);
+
+module.exports = RolePermission;
