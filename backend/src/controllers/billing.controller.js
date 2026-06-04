@@ -146,13 +146,23 @@ const createInvoice = async (req, res, next) => {
   try {
     const { householdId, feePeriodId, dueDate, createdBy, items = [] } = req.body;
 
-    if (!householdId || !feePeriodId || !createdBy) {
+    const errors = [];
+
+    if (!householdId) {
+      errors.push({ field: 'householdId', code: 'VAL_001', message: 'householdId is required' });
+    }
+
+    if (!feePeriodId) {
+      errors.push({ field: 'feePeriodId', code: 'VAL_001', message: 'feePeriodId is required' });
+    }
+
+    if (!createdBy) {
+      errors.push({ field: 'createdBy', code: 'VAL_001', message: 'createdBy is required' });
+    }
+
+    if (errors.length) {
       await transaction.rollback();
-      return sendError(res, 400, 'Missing required fields', [
-        { field: 'householdId', code: 'VAL_001', message: 'householdId is required' },
-        { field: 'feePeriodId', code: 'VAL_001', message: 'feePeriodId is required' },
-        { field: 'createdBy', code: 'VAL_001', message: 'createdBy is required' },
-      ]);
+      return sendError(res, 400, 'Missing required fields', errors);
     }
 
     const household = await Household.findByPk(Number(householdId));
