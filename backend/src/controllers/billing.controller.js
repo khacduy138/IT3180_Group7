@@ -169,6 +169,24 @@ const createInvoice = async (req, res, next) => {
 
     const invoiceNumber = buildInvoiceNumber(feePeriod, household);
 
+    const createdById = Number(createdBy);
+    if (!Number.isInteger(createdById)) {
+      await transaction.rollback();
+      return sendError(res, 400, 'Invalid createdBy', [
+        { field: 'createdBy', code: 'VAL_002', message: 'createdBy must be an integer' },
+      ]);
+    }
+
+    const existingInvoice = await Invoice.findOne({
+      where: { household_id: household.id, fee_period_id: feePeriod.id },
+      transaction,
+    });
+
+    if (existingInvoice) {
+      await transaction.rollback();
+      return sendError(res, 409, 'Invoice already exists for this household and fee period');
+    }
+
     const invoice = await Invoice.create(
       {
         uuid: crypto.randomUUID(),
@@ -178,7 +196,7 @@ const createInvoice = async (req, res, next) => {
         total_amount: 0,
         status: 'PENDING',
         due_date: dueDate || null,
-        created_by: Number(createdBy),
+        created_by: createdById,
       },
       { transaction }
     );
