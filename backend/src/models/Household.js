@@ -1,10 +1,9 @@
-const { DataTypes, Model } = require('sequelize');
+const { DataTypes } = require('sequelize');
 
 const sequelize = require('../config/database');
 
-class User extends Model {}
-
-User.init(
+const Household = sequelize.define(
+  'Household',
   {
     id: {
       type: DataTypes.INTEGER,
@@ -12,34 +11,31 @@ User.init(
       autoIncrement: true,
       primaryKey: true,
     },
-    username: {
+    uuid: {
+      type: DataTypes.CHAR(36),
+      allowNull: false,
+      unique: true,
+    },
+    room_number: {
       type: DataTypes.STRING,
       allowNull: false,
       unique: true,
     },
-    password_hash: {
+    square_meters: {
+      type: DataTypes.DECIMAL(8, 2),
+      allowNull: false,
+    },
+    status: {
       type: DataTypes.STRING,
       allowNull: false,
     },
-    role_id: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
-    },
-    is_active: {
-      type: DataTypes.BOOLEAN,
-      allowNull: false,
-      defaultValue: true,
-    },
   },
   {
-    sequelize,
-    modelName: 'User',
-    tableName: 'users',
+    tableName: 'households',
     timestamps: true,
     createdAt: 'created_at',
     updatedAt: 'updated_at',
-    underscored: true,
-  },
+  }
 );
 
-module.exports = User;
+module.exports = Household;

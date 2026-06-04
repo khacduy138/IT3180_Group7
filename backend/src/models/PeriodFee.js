@@ -1,10 +1,9 @@
-const { DataTypes, Model } = require('sequelize');
+const { DataTypes } = require('sequelize');
 
 const sequelize = require('../config/database');
 
-class Permission extends Model {}
-
-Permission.init(
+const PeriodFee = sequelize.define(
+  'PeriodFee',
   {
     id: {
       type: DataTypes.INTEGER,
@@ -12,21 +11,21 @@ Permission.init(
       autoIncrement: true,
       primaryKey: true,
     },
-    name: {
-      type: DataTypes.STRING,
+    fee_period_id: {
+      type: DataTypes.INTEGER,
       allowNull: false,
-      unique: true,
+    },
+    fee_type_id: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
     },
   },
   {
-    sequelize,
-    modelName: 'Permission',
-    tableName: 'permissions',
+    tableName: 'period_fees',
     timestamps: true,
     createdAt: 'created_at',
     updatedAt: 'updated_at',
-    underscored: true,
-  },
+  }
 );
 
-module.exports = Permission;
+module.exports = PeriodFee;

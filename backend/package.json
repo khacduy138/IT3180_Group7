@@ -18,12 +18,12 @@
     "management",
     "ams"
   ],
-  "author": "BlueMoon Team",
+  "author": "Nhom 7 - BlueMoon Team",
   "license": "MIT",
   "jest": {
     "testEnvironment": "node",
     "setupFiles": [
-      "./jest.setup.js"
+      "./config/jest.setup.js"
     ]
   },
   "dependencies": {
@@ -35,7 +35,7 @@
     "helmet": "^8.0.0",
     "jsonwebtoken": "^9.0.2",
     "mysql2": "^3.11.5",
-    "sequelize": "^6.37.5"
+    "sequelize": "^6.37.8"
   },
   "devDependencies": {
     "eslint": "^8.54.0",
@@ -50,7 +50,7 @@
       "Version: Set to 1.0.0 for first complete backend structure.",
       "Scripts: Integrated ESLint (develop) and DB Migration/Seeding commands (feature).",
       "Testing: Updated Jest to use --passWithNoTests to prevent CI failure on empty test folders.",
-      "Dependencies: Bumped all versions to latest stable (Express 4.21+, Sequelize 6.37+, Dotenv 16.4+) to fix security vulnerabilities and add new features.",
+      "Dependencies: Bumped all versions to latest stable (Express 4.21+, Sequelize 6.37+, Dotenv 17.4+) to fix security vulnerabilities and add new features.",
       "Security: Added 'helmet' package to enhance API header security."
     ],
     "resolvedBy": "Project Lead",

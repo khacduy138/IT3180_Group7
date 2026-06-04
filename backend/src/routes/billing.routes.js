@@ -1,12 +1,12 @@
 const express = require('express');
+
+const billingController = require('../controllers/billing.controller');
+
 const router = express.Router();
 
-router.get('/', (req, res) => {
-  res.json({ message: 'Get invoices - to be implemented', data: [] });
-});
-
-router.post('/', (req, res) => {
-  res.json({ message: 'Create invoice - to be implemented' });
-});
+router.get('/', billingController.listInvoices);
+router.get('/:id', billingController.getInvoice);
+router.post('/', billingController.createInvoice);
+router.post('/:id/payments', billingController.createPayment);
 
 module.exports = router;

@@ -1,41 +1,15 @@
 
-/*
- * Auth routes placeholder.
- *
- * Purpose:
- * - Define URLs for login, logout, and change password.
- *
- * TODO:
- * - POST /auth/login.
- * - POST /auth/logout.
- * - POST /auth/change-password.
- */
-
 const express = require('express');
+
+const authController = require('../controllers/auth.controller');
+const authenticate = require('../middleware/authenticate');
+
 const router = express.Router();
 
-/*
- * Auth routes placeholder.
- *
- * Purpose:
- * - Define URLs for login, logout, and change password.
- *
- * TODO:
- * - POST /auth/login.
- * - POST /auth/logout.
- * - POST /auth/change-password.
- */
+router.post('/login', authController.login);
 
-router.post('/login', (req, res) => {
-  res.json({ message: 'Login - to be implemented' });
-});
+router.post('/logout', authenticate, authController.logout);
 
-router.post('/logout', (req, res) => {
-  res.json({ message: 'Logout - to be implemented' });
-});
-
-router.post('/change-password', (req, res) => {
-  res.json({ message: 'Change password - to be implemented' });
-});
+router.post('/change-password', authenticate, authController.changePassword);
 
 module.exports = router;

@@ -1,14 +1,8 @@
 require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
 
-const app = express();
+const app = require('./app');
 
-// 1. Middlewares
-app.use(helmet()); // Bảo mật header (mới thêm từ package.json)
-app.use(cors());
-app.use(express.json());
+const PORT = process.env.PORT || 3001;
 
 // 2. Health check route
 app.get('/api/health', (req, res) => {
@@ -32,3 +26,5 @@ if (process.env.NODE_ENV !== 'test') {
     console.log(`[Server]: BlueMoon AMS Backend is running on port ${PORT}`);
   });
 }
+
+module.exports = app;
