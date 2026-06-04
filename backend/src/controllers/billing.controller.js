@@ -231,13 +231,13 @@ const createInvoice = async (req, res, next) => {
           ]);
         }
 
-        if (quantity <= 0 || priceSnapshot < 0) {
+        if (!Number.isFinite(quantity) || !Number.isFinite(priceSnapshot) || quantity <= 0 || priceSnapshot < 0) {
           await transaction.rollback();
           return sendError(res, 400, 'Invalid item values', [
             {
               field: 'items',
               code: 'VAL_002',
-              message: 'Quantity must be > 0 and priceSnapshot must be >= 0',
+              message: 'Quantity must be a finite number > 0 and priceSnapshot must be a finite number >= 0',
             },
           ]);
         }
