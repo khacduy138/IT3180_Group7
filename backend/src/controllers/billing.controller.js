@@ -61,8 +61,15 @@ const listInvoices = async (req, res, next) => {
       where.household_id = householdId;
     }
 
-    if (req.query.feePeriodId) {
-      where.fee_period_id = Number(req.query.feePeriodId);
+    if (req.query.feePeriodId !== undefined) {
+      const feePeriodId = Number(req.query.feePeriodId);
+      if (!Number.isFinite(feePeriodId)) {
+        return sendError(res, 400, 'Invalid feePeriodId', [
+          { field: 'feePeriodId', code: 'VAL_002', message: 'feePeriodId must be a number' },
+        ]);
+      }
+
+      where.fee_period_id = feePeriodId;
     }
 
     const { rows, count } = await Invoice.findAndCountAll({
