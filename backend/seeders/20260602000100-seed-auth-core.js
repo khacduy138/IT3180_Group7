@@ -3,78 +3,50 @@
 const bcrypt = require('bcrypt');
 const { QueryTypes } = require('sequelize');
 
-const roles = ['admin', 'accountant', 'staff', 'resident'];
+const roles = [
+  {
+    name: 'admin',
+    description: 'Full system administrator with all permissions.',
+  },
+  {
+    name: 'accountant',
+    description: 'Handles fees, billing, invoices, and payment records.',
+  },
+  {
+    name: 'staff',
+    description: 'Manages household and resident information.',
+  },
+];
+const roleNames = roles.map((role) => role.name);
 
+// Permission names use plural resource:action, e.g. users:create.
 const permissions = [
-  'auth:login',
-  'auth:logout',
-  'auth:change-password',
+  'users:create',
   'users:read',
-  'users:write',
+  'users:update',
+  'users:delete',
   'households:read',
   'households:write',
   'residents:read',
   'residents:write',
   'fees:read',
   'fees:write',
-  'invoices:read',
-  'invoices:write',
-  'payments:read',
-  'payments:write',
+  'billing:read',
+  'billing:write',
   'reports:read',
 ];
 
 const rolePermissions = {
   admin: permissions,
-  accountant: [
-    'auth:login',
-    'auth:logout',
-    'auth:change-password',
-    'households:read',
-    'residents:read',
-    'fees:read',
-    'fees:write',
-    'invoices:read',
-    'invoices:write',
-    'payments:read',
-    'payments:write',
-    'reports:read',
-  ],
+  accountant: ['billing:read', 'billing:write', 'fees:read'],
   staff: [
-    'auth:login',
-    'auth:logout',
-    'auth:change-password',
     'households:read',
     'households:write',
     'residents:read',
     'residents:write',
-    'fees:read',
-    'invoices:read',
-  ],
-  resident: [
-    'auth:login',
-    'auth:logout',
-    'auth:change-password',
-    'households:read',
-    'residents:read',
-    'invoices:read',
-    'payments:read',
   ],
 };
 
-/*
-  U only need to understand these concepts:
-  - async functions: Functions that get out of call stack when they hit an await, allowing other code to run. They return a promise.
-  - promise: An object representing the eventual completion or failure of an asynchronous operation. It can be in pending, fulfilled, or rejected state.
-  - await: Pauses the async function until the promise is resolved, then returns the result. It allows writing asynchronous code in a synchronous style.
-  - transactions: A way to group multiple database operations together. If any operation fails, the whole transaction can be rolled back to maintain data integrity.
-  - queryInterface.sequelize.query: A method to run raw SQL queries using Sequelize's connection. It allows you to write custom SQL when needed.
-  - replacements: { name: permission } is a JS object { name_of_placeholder: JS_value } that maps the named parameter :name in the SQL query to the value of the variable permission. This allows you to safely include dynamic values in your SQL queries without risking SQL injection.
-  - replacements: { names } is a shorthand for { names: names } 
-*/
-
-// Helper function to get rows by name from a table within a transaction
-// returns an array of JS objects with id and name properties
 async function getRowsByName(queryInterface, tableName, names, transaction) {
   return queryInterface.sequelize.query(
     `SELECT id, name FROM ${tableName} WHERE name IN (:names)`,
@@ -86,7 +58,6 @@ async function getRowsByName(queryInterface, tableName, names, transaction) {
   );
 }
 
-// Helper function to convert an array of rows with id and name properties into a map of name to id
 function toIdMap(rows) {
   return rows.reduce((map, row) => {
     map[row.name] = row.id;
@@ -104,12 +75,17 @@ module.exports = {
       for (const role of roles) {
         await queryInterface.sequelize.query(
           `
-          INSERT INTO roles (name, created_at, updated_at)
-          VALUES (:name, NOW(), NOW())
-          ON DUPLICATE KEY UPDATE updated_at = VALUES(updated_at)
+          INSERT INTO roles (name, description, created_at, updated_at)
+          VALUES (:name, :description, NOW(), NOW())
+          ON DUPLICATE KEY UPDATE
+            description = VALUES(description),
+            updated_at = VALUES(updated_at)
           `,
           {
-            replacements: { name: role },
+            replacements: {
+              name: role.name,
+              description: role.description,
+            },
             transaction,
           },
         );
@@ -133,7 +109,7 @@ module.exports = {
       const roleRows = await getRowsByName(
         queryInterface,
         'roles',
-        roles,
+        roleNames,
         transaction,
       );
       const permissionRows = await getRowsByName(
@@ -145,6 +121,18 @@ module.exports = {
 
       const roleIds = toIdMap(roleRows);
       const permissionIds = toIdMap(permissionRows);
+      const managedRoleIds = Object.values(roleIds);
+
+      await queryInterface.sequelize.query(
+        `
+        DELETE FROM role_permissions
+        WHERE role_id IN (:roleIds)
+        `,
+        {
+          replacements: { roleIds: managedRoleIds },
+          transaction,
+        },
+      );
 
       for (const [roleName, permissionNames] of Object.entries(
         rolePermissions,
@@ -182,18 +170,18 @@ module.exports = {
           created_at,
           updated_at
         )
-        VALUES (
+        SELECT
           'admin',
           :passwordHash,
           :roleId,
           TRUE,
           NOW(),
           NOW()
+        WHERE NOT EXISTS (
+          SELECT 1
+          FROM users
+          WHERE username = 'admin'
         )
-        ON DUPLICATE KEY UPDATE
-          role_id = VALUES(role_id),
-          is_active = VALUES(is_active),
-          updated_at = VALUES(updated_at)
         `,
         {
           replacements: {
@@ -211,7 +199,7 @@ module.exports = {
       const roleRows = await getRowsByName(
         queryInterface,
         'roles',
-        roles,
+        roleNames,
         transaction,
       );
       const permissionRows = await getRowsByName(
@@ -261,7 +249,7 @@ module.exports = {
           )
         `,
         {
-          replacements: { roles },
+          replacements: { roles: roleNames },
           transaction,
         },
       );

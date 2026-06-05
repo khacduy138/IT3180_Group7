@@ -27,6 +27,9 @@ Current migration order:
    - `invoice_items`
    - `payments`
 
+5. `20260605000100-add-description-to-roles.js`
+   - adds nullable `roles.description`
+
 Run migrations from `backend/`:
 
 ```bash
