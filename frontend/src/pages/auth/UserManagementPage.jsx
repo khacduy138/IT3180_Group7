@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, UserPlus, Search, MoreVertical, UserCheck, UserMinus } from 'lucide-react';
+import { Shield, UserPlus, Search, UserCheck, UserMinus, Edit2 } from 'lucide-react';
+import { useForm } from 'react-hook-form';
 
 import TopBar from '../../components/ui/TopBar';
 import Sidebar from '../../components/ui/Sidebar';
@@ -9,12 +10,41 @@ import { Tag } from '../../components/ui/Tag';
 import { Spinner } from '../../components/ui/Spinner';
 import { Toast } from '../../components/ui/Toast';
 import { Input } from '../../components/ui/Input';
+import { Modal, ModalHeader, ModalBody, ModalFooter } from '../../components/ui/Modal';
+import { Form, FormField, FormItem, FormLabel, FormControl } from '../../components/ui/Form';
+import { Select } from '../../components/ui/Select';
 
 export default function UserManagementPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState({ open: false, variant: 'success', title: '', description: '' });
+
+  // States cho Modal
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
+
+  // Options cho vai trò
+  const roleOptions = [
+    { value: 'admin', label: 'Quản trị viên' },
+    { value: 'accountant', label: 'Kế toán' },
+    { value: 'staff', label: 'Nhân viên' },
+    { value: 'resident', label: 'Cư dân' },
+  ];
+
+  const statusOptions = [
+    { value: true, label: 'Hoạt động' },
+    { value: false, label: 'Bị khóa' },
+  ];
+
+  // Khởi tạo Form
+  const addForm = useForm({
+    defaultValues: { username: '', password: '', role: 'resident' }
+  });
+
+  const editForm = useForm();
+
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -48,6 +78,16 @@ export default function UserManagementPage() {
     fetchUsers();
   }, []);
 
+  const openEditModal = (user) => {
+    setSelectedUser(user);
+    editForm.reset({
+      username: user.username,
+      role: user.role?.name || user.role,
+      is_active: user.is_active
+    });
+    setIsEditModalOpen(true);
+  };
+
   const getRoleBadge = (roleName) => {
     switch (roleName?.toLowerCase()) {
       case 'admin': return <Tag color="red">Quản trị viên</Tag>;
@@ -69,14 +109,14 @@ export default function UserManagementPage() {
             
             <div className="flex justify-between items-end">
               <div>
-                <div className="flex items-center gap-2 text-primary mb-1">
+                <div className="flex items-center gap-2 text-muted-foreground mb-1">
                   <Shield size={20} />
                   <span className="text-sm font-bold uppercase tracking-wider">Hệ thống quản trị</span>
                 </div>
                 <h1 className="text-4xl font-bold tracking-tight text-foreground">Quản lý người dùng</h1>
               </div>
               
-              <Button className="gap-2" variant="default">
+              <Button className="gap-2" variant="default" onClick={() => setIsAddModalOpen(true)}>
                 <UserPlus size={18} /> Thêm tài khoản
               </Button>
             </div>
@@ -133,8 +173,8 @@ export default function UserManagementPage() {
                             {new Date(user.created_at).toLocaleDateString('vi-VN')}
                           </TableCell>
                           <TableCell className="text-right">
-                            <Button variant="outline" size="icon" className="h-8 w-8">
-                              <MoreVertical size={14} />
+                            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => openEditModal(user)}>
+                              <Edit2 size={14} />
                             </Button>
                           </TableCell>
                         </TableRow>
@@ -154,6 +194,71 @@ export default function UserManagementPage() {
         </main>
       </div>
 
+      {/* MODAL THÊM TÀI KHOẢN */}
+      <Modal open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
+        <ModalHeader>Thêm tài khoản mới</ModalHeader>
+        <ModalBody>
+          <Form {...addForm}>
+            <form className="space-y-4">
+              <FormField name="username" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Tên đăng nhập</FormLabel>
+                  <FormControl><Input placeholder="VD: nhanvien_moi" {...field} /></FormControl>
+                </FormItem>
+              )} />
+              <FormField name="password" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Mật khẩu</FormLabel>
+                  <FormControl><Input type="password" placeholder="••••••••" {...field} /></FormControl>
+                </FormItem>
+              )} />
+              <FormField name="role" render={({ field }) => (
+                <FormItem className="space-x-5">
+                  <FormLabel>Vai trò</FormLabel>
+                  <FormControl>
+                    <Select options={roleOptions} value={field.value} onValueChange={field.onChange} className="w-full" />
+                  </FormControl>
+                </FormItem>
+              )} />
+            </form>
+          </Form>
+        </ModalBody>
+        <ModalFooter>
+          <Button variant="outline" onClick={() => setIsAddModalOpen(false)}>Hủy</Button>
+          <Button onClick={() => setIsAddModalOpen(false)}>Lưu tài khoản</Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* MODAL CHỈNH SỬA TÀI KHOẢN */}
+      <Modal open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+        <ModalHeader>Chỉnh sửa tài khoản: {selectedUser?.username}</ModalHeader>
+        <ModalBody>
+          <Form {...editForm}>
+            <form className="space-y-4">
+              <FormField name="role" render={({ field }) => (
+                <FormItem className="space-x-5">
+                  <FormLabel>Vai trò</FormLabel>
+                  <FormControl>
+                    <Select options={roleOptions} value={field.value} onValueChange={field.onChange} className="w-full" />
+                  </FormControl>
+                </FormItem>
+              )} />
+              <FormField name="is_active" render={({ field }) => (
+                <FormItem className="space-x-5">
+                  <FormLabel>Trạng thái</FormLabel>
+                  <FormControl >
+                    <Select options={statusOptions} value={field.value} onValueChange={field.onChange} className="w-full" />
+                  </FormControl>
+                </FormItem>
+              )} />
+            </form>
+          </Form>
+        </ModalBody>
+        <ModalFooter>
+          <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>Hủy</Button>
+          <Button onClick={() => setIsEditModalOpen(false)}>Cập nhật</Button>
+        </ModalFooter>
+      </Modal>
       <Toast 
         open={toast.open} 
         onOpenChange={(open) => setToast({...toast, open})}
