@@ -1,12 +1,12 @@
-import { LayoutDashboard, Settings, ShoppingBag, User } from "lucide-react";
+import { LayoutDashboard, Settings, BookUser, Banknote , Receipt } from "lucide-react";
 //import { path } from "../../../../backend/src/server";
 
 export const TOP_BAR_ITEMS = [
     {
-    label: "Services",
-    path: "/index",
-    icon: ShoppingBag,
-    allowedRoles: ["customer","admin", "manager"],
+    label: "Users",
+    path: "/users",
+    icon: BookUser,
+    allowedRoles: ["admin", "manager"],
   },
   {
     label: "Dashboard",
@@ -18,13 +18,13 @@ export const TOP_BAR_ITEMS = [
   {
     label: "Bills",
     path: "/billing",
-    icon: User,
+    icon: Receipt,
     allowedRoles: ["admin", "manager", "customer"],
   },
   {
     label: "Fees",
     path: "/fees",
-    icon: User,
+    icon: Banknote,
     allowedRoles: ["admin"], 
   },
   {

@@ -3,6 +3,8 @@ import { buttonVariants } from './components/ui/Button';
 import UISample from './pages/UISample';
 import LoginPage from './pages/auth/LoginPage';
 import DashboardPage from './pages/dashboard/DashboardPage';
+import UserManagementPage from './pages/auth/UserManagementPage';
+
 
 function HomePage() {
   return (
@@ -29,6 +31,7 @@ function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/uisample" element={<UISample />} />
         <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/users" element={<UserManagementPage />} />
       </Routes>
     </BrowserRouter>
   );
