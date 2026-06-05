@@ -1,14 +1,29 @@
-/*
- * Users controller placeholder.
- *
- * Purpose:
- * - Manage system accounts.
- * - List users for admin.
- * - Create, update, and deactivate users.
- *
- * TODO:
- * - Implement GET /users.
- * - Implement POST /users.
- * - Implement PUT /users/:id.
- * - Implement DELETE /users/:id as soft deactivate.
- */
+const { User, Role } = require('../models');
+
+const listUsers = async (req, res) => {
+  try {
+    const users = await User.findAll({
+      attributes: ['id', 'username', 'is_active', 'created_at'],
+      include: [
+        {
+          model: Role,
+          as: 'role',
+          attributes: ['id', 'name']
+        }
+      ],
+      order: [['created_at', 'DESC']]
+    });
+
+    return res.json({
+      success: true,
+      data: users
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Lỗi khi lấy danh sách người dùng' });
+  }
+};
+
+module.exports = {
+  listUsers
+};
