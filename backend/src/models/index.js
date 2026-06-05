@@ -3,6 +3,17 @@ const User = require('./User');
 const Role = require('./Role');
 const Permission = require('./Permission');
 const RolePermission = require('./RolePermission');
+const Household = require('./Household');
+const Resident = require('./Resident');
+const HouseholdMember = require('./HouseholdMember');
+const Vehicle = require('./Vehicle');
+const FeeType = require('./FeeType');
+const FeePeriod = require('./FeePeriod');
+const PeriodFee = require('./PeriodFee');
+const Invoice = require('./Invoice');
+const InvoiceItem = require('./InvoiceItem');
+const Payment = require('./Payment');
+const FeeUsage = require('./FeeUsage');
 
 User.belongsTo(Role, {
   as: 'role',
@@ -54,4 +65,15 @@ module.exports = {
   Role,
   Permission,
   RolePermission,
+  Household,
+  Resident,
+  HouseholdMember,
+  Vehicle,
+  FeeType,
+  FeePeriod,
+  PeriodFee,
+  Invoice,
+  InvoiceItem,
+  Payment,
+  FeeUsage
 };
