@@ -20,8 +20,8 @@ const router = express.Router();
  *   src/middleware/authenticate.js.
  */
 
-// const authenticate = require('../middleware/authenticate');
-// router.use(authenticate);
+const authenticate = require('../middleware/authenticate');
+router.use(authenticate);
 
 function notImplemented(resource, action) {
   return (req, res) => {
