@@ -17,6 +17,7 @@ const FeeUsage = require('./FeeUsage');
 const Invoice = require('./Invoice');
 const InvoiceItem = require('./InvoiceItem');
 const Payment = require('./Payment');
+const DemographicChange = require('./DemographicChange');
 
 /* ── Module 1: Auth & RBAC ─────────────────────────────────── */
 
@@ -66,6 +67,13 @@ Vehicle.belongsTo(Household, { as: 'household', foreignKey: 'household_id' });
 
 Resident.belongsTo(User, { as: 'user', foreignKey: 'user_id' });
 User.hasOne(Resident, { as: 'resident', foreignKey: 'user_id' });
+
+Resident.hasMany(DemographicChange, { as: 'demographic_changes', foreignKey: 'resident_id' });
+DemographicChange.belongsTo(Resident, { as: 'resident', foreignKey: 'resident_id' });
+Household.hasMany(DemographicChange, { as: 'demographic_changes', foreignKey: 'household_id' });
+DemographicChange.belongsTo(Household, { as: 'household', foreignKey: 'household_id' });
+DemographicChange.belongsTo(User, { as: 'creator', foreignKey: 'created_by' });
+User.hasMany(DemographicChange, { as: 'created_demographic_changes', foreignKey: 'created_by' });
 
 /* ── Module 3: Fee Configuration ───────────────────────────── */
 
@@ -165,4 +173,5 @@ module.exports = {
   Invoice,
   InvoiceItem,
   Payment,
+  DemographicChange,
 };

@@ -5,6 +5,8 @@ import LoginPage from './pages/auth/LoginPage';
 import DashboardPage from './pages/dashboard/DashboardPage';
 import UserManagementPage from './pages/auth/UserManagementPage';
 import InvoiceListPage from './pages/billing/InvoiceListPage';
+import HouseholdDetailPage from './pages/households/HouseholdDetailPage';
+import HouseholdsListPage from './pages/households/HouseholdsListPage';
 
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem('token');
@@ -59,6 +61,22 @@ function App() {
           element={
             <ProtectedRoute>
               <InvoiceListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/households"
+          element={
+            <ProtectedRoute>
+              <HouseholdsListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/households/:id"
+          element={
+            <ProtectedRoute>
+              <HouseholdDetailPage />
             </ProtectedRoute>
           }
         />

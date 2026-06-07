@@ -1,8 +1,7 @@
-import { LayoutDashboard, Settings, BookUser, Banknote , Receipt } from "lucide-react";
-//import { path } from "../../../../backend/src/server";
+import { LayoutDashboard, Settings, BookUser, Banknote, Receipt, Home } from "lucide-react";
 
 export const TOP_BAR_ITEMS = [
-    {
+  {
     label: "Users",
     path: "/users",
     icon: BookUser,
@@ -14,7 +13,12 @@ export const TOP_BAR_ITEMS = [
     icon: LayoutDashboard,
     allowedRoles: ["admin", "manager", "customer"],
   },
-  
+  {
+    label: "Hộ gia đình",
+    path: "/households",
+    icon: Home,
+    allowedRoles: ["admin", "manager", "customer"],
+  },
   {
     label: "Bills",
     path: "/billing",
@@ -25,12 +29,12 @@ export const TOP_BAR_ITEMS = [
     label: "Fees",
     path: "/fees",
     icon: Banknote,
-    allowedRoles: ["admin"], 
+    allowedRoles: ["admin"],
   },
   {
     label: "Settings",
     path: "/settings",
     icon: Settings,
     allowedRoles: ["admin", "manager", "customer"],
-  }
+  },
 ];
