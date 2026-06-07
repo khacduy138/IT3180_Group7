@@ -426,8 +426,9 @@ const createPayment = async (req, res, next) => {
     const errors = [];
 
     const amountNumber = Number(amount);
-    const createdById = Number(createdBy);
-    const paymentTimestamp = Date.parse(paymentDate);
+    const createdById = Number(createdBy ?? req.user?.id);
+    const paymentDateValue = paymentDate ? new Date(paymentDate) : new Date();
+    const paymentTimestamp = paymentDateValue.getTime();
 
     if (!Number.isFinite(invoiceId) || invoiceId <= 0) {
       errors.push({ field: 'id', code: 'VAL_002', message: 'id must be a positive integer' });
@@ -441,7 +442,7 @@ const createPayment = async (req, res, next) => {
       errors.push({ field: 'paymentMethod', code: 'VAL_001', message: 'paymentMethod is required' });
     }
 
-    if (!paymentDate || Number.isNaN(paymentTimestamp)) {
+    if (Number.isNaN(paymentTimestamp)) {
       errors.push({ field: 'paymentDate', code: 'VAL_002', message: 'paymentDate must be a valid date' });
     }
 
@@ -469,40 +470,93 @@ const createPayment = async (req, res, next) => {
       return sendError(res, 409, 'Invoice is already fully paid');
     }
 
+    const currentPaidAmount = Number(invoice.paid_amount || 0);
+    const totalAmount = Number(invoice.total_amount || 0);
+    const nextPaidAmount = Number((currentPaidAmount + amountNumber).toFixed(2));
+
+    if (nextPaidAmount > totalAmount) {
+      await transaction.rollback();
+      return sendError(res, 400, 'Payment amount exceeds remaining invoice balance', [
+        {
+          field: 'amount',
+          code: 'VAL_004',
+          message: 'amount must not exceed remaining invoice balance',
+        },
+      ]);
+    }
+
     const payment = await Payment.create(
       {
         invoice_id: invoice.id,
         amount: amountNumber,
         payment_method: paymentMethod,
-        payment_date: paymentDate,
+        payment_date: paymentDateValue,
         note: note || null,
         created_by: createdById,
       },
       { transaction }
     );
 
-    const totalPaid = Number(
-      await Payment.sum('amount', {
-        where: { invoice_id: invoice.id },
-        transaction,
-      })
-    );
-    const newStatus = getNewStatus(Number(invoice.total_amount), totalPaid);
+    const newStatus = getNewStatus(totalAmount, nextPaidAmount);
 
     if (!canTransition(invoice.status, newStatus)) {
       await transaction.rollback();
       return sendError(res, 409, 'Invalid invoice status transition');
     }
 
-    invoice.paid_amount = totalPaid;
+    invoice.paid_amount = nextPaidAmount;
     invoice.status = newStatus;
     await invoice.save({ transaction });
 
     await transaction.commit();
 
-    return sendSuccess(res, 201, 'Payment recorded successfully', payment);
+    return sendSuccess(res, 201, 'Payment recorded successfully', {
+      payment,
+      invoice: {
+        id: invoice.id,
+        invoice_number: invoice.invoice_number,
+        household_id: invoice.household_id,
+        total_amount: invoice.total_amount,
+        paid_amount: invoice.paid_amount,
+        status: invoice.status,
+      },
+    });
   } catch (error) {
     await transaction.rollback();
+    return next(error);
+  }
+};
+
+const listPayments = async (req, res, next) => {
+  try {
+    const where = {};
+
+    if (req.query.invoiceId !== undefined && req.query.invoiceId !== '') {
+      const invoiceId = Number(req.query.invoiceId);
+
+      if (!Number.isFinite(invoiceId) || invoiceId <= 0) {
+        return sendError(res, 400, 'Invalid invoiceId', [
+          { field: 'invoiceId', code: 'VAL_002', message: 'invoiceId must be a positive number' },
+        ]);
+      }
+
+      where.invoice_id = invoiceId;
+    }
+
+    const payments = await Payment.findAll({
+      where,
+      include: [
+        {
+          model: Invoice,
+          as: 'invoice',
+          include: [{ model: Household, as: 'household' }],
+        },
+      ],
+      order: [['payment_date', 'DESC'], ['created_at', 'DESC']],
+    });
+
+    return sendSuccess(res, 200, 'Payments retrieved successfully', payments);
+  } catch (error) {
     return next(error);
   }
 };
@@ -513,4 +567,5 @@ module.exports = {
   generateInvoicesForFeePeriod,
   createInvoice,
   createPayment,
+  listPayments,
 };
