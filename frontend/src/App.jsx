@@ -4,6 +4,7 @@ import UISample from './pages/UISample';
 import LoginPage from './pages/auth/LoginPage';
 import DashboardPage from './pages/dashboard/DashboardPage';
 import UserManagementPage from './pages/auth/UserManagementPage';
+import InvoiceListPage from './pages/billing/InvoiceListPage';
 
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem('token');
@@ -50,6 +51,14 @@ function App() {
           element={
             <ProtectedRoute>
               <UserManagementPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/billing"
+          element={
+            <ProtectedRoute>
+              <InvoiceListPage />
             </ProtectedRoute>
           }
         />
