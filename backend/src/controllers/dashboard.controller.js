@@ -57,8 +57,8 @@ const getReportByPeriod = async (req, res) => {
     const report = await Invoice.findAll({
       where: { fee_period_id: periodId },
       include: [
-        { model: Household, attributes: ['room_number', 'square_meters'] },
-        { model: FeePeriod, attributes: ['name', 'month', 'year'] }
+        { model: Household, as: 'household', attributes: ['room_number', 'square_meters'] },
+        { model: FeePeriod, as: 'fee_period', attributes: ['name', 'month', 'year'] }
       ],
       order: [['status', 'ASC']]
     });

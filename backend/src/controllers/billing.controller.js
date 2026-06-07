@@ -348,6 +348,8 @@ const createPayment = async (req, res, next) => {
 
     const updatedPaid = totalPaid + Number(payment.amount);
 
+    invoice.paid_amount = updatedPaid;
+
     if (updatedPaid >= Number(invoice.total_amount)) {
       invoice.status = 'PAID';
     } else if (updatedPaid > 0) {

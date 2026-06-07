@@ -11,6 +11,12 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '.
 import { Tag } from '../../components/ui/Tag';
 import { Toast } from '../../components/ui/Toast';
 
+const STATUS_MAP = {
+  PAID: { label: 'Đã nộp', color: 'green' },
+  PARTIAL: { label: 'Nộp một phần', color: 'yellow' },
+  PENDING: { label: 'Chưa nộp', color: 'red' },
+};
+
 export default function DashboardPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [stats, setStats] = useState({
@@ -19,6 +25,7 @@ export default function DashboardPage() {
     householdsWithDebt: 0,
     totalHouseholds: 0
   });
+  const [recentInvoices, setRecentInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState({ open: false, variant: 'success', title: '', description: '' });
 
@@ -26,16 +33,23 @@ export default function DashboardPage() {
     const fetchDashboardData = async () => {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch('http://localhost:3001/api/dashboard/summary', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        const result = await response.json();
-        if (response.ok) {
-          setStats(result.data);
+        const headers = { 'Authorization': `Bearer ${token}` };
+
+        const [summaryRes, invoicesRes] = await Promise.all([
+          fetch('http://localhost:3001/api/dashboard/summary', { headers }),
+          fetch('http://localhost:3001/api/billing?pageSize=5', { headers }),
+        ]);
+
+        const summaryResult = await summaryRes.json();
+        if (summaryRes.ok) {
+          setStats(summaryResult.data);
         } else {
           setToast({ open: true, variant: 'error', title: 'Lỗi', description: 'Không thể tải dữ liệu thống kê' });
+        }
+
+        const invoicesResult = await invoicesRes.json();
+        if (invoicesRes.ok) {
+          setRecentInvoices(invoicesResult.data || []);
         }
       } catch (error) {
         setToast({ open: true, variant: 'error', title: 'Lỗi kết nối', description: 'Vui lòng kiểm tra server' });
@@ -134,31 +148,34 @@ export default function DashboardPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>Số hóa đơn</TableHead>
                     <TableHead>Mã hộ</TableHead>
-                    <TableHead>Đầu mục</TableHead>
+                    <TableHead>Kỳ thu</TableHead>
                     <TableHead>Số tiền</TableHead>
                     <TableHead>Trạng thái</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  <TableRow>
-                    <TableCell className="font-medium">HH-A101</TableCell>
-                    <TableCell>Phí quản lý tháng 5</TableCell>
-                    <TableCell>{formatCurrency(1500000)}</TableCell>
-                    <TableCell><Tag color="green">Đã nộp</Tag></TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="font-medium">HH-B204</TableCell>
-                    <TableCell>Tiền điện tháng 5</TableCell>
-                    <TableCell>{formatCurrency(840000)}</TableCell>
-                    <TableCell><Tag color="yellow">Chưa nộp</Tag></TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="font-medium">HH-C506</TableCell>
-                    <TableCell>Phí vệ sinh</TableCell>
-                    <TableCell>{formatCurrency(100000)}</TableCell>
-                    <TableCell><Tag color="red">Muộn</Tag></TableCell>
-                  </TableRow>
+                  {recentInvoices.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                        Chưa có dữ liệu hóa đơn
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    recentInvoices.map((invoice) => {
+                      const statusInfo = STATUS_MAP[invoice.status] || { label: invoice.status, color: 'gray' };
+                      return (
+                        <TableRow key={invoice.id}>
+                          <TableCell className="font-medium">{invoice.invoice_number}</TableCell>
+                          <TableCell>{invoice.household?.room_number ?? '-'}</TableCell>
+                          <TableCell>{invoice.fee_period?.name ?? '-'}</TableCell>
+                          <TableCell>{formatCurrency(invoice.total_amount)}</TableCell>
+                          <TableCell><Tag color={statusInfo.color}>{statusInfo.label}</Tag></TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
                 </TableBody>
               </Table>
             </div>
