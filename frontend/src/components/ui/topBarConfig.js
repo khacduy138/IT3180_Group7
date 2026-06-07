@@ -26,8 +26,14 @@ export const TOP_BAR_ITEMS = [
     allowedRoles: ["admin", "manager", "customer"],
   },
   {
-    label: "Fees",
-    path: "/fees",
+    label: "Loại phí",
+    path: "/fees/types",
+    icon: Banknote,
+    allowedRoles: ["admin"],
+  },
+  {
+    label: "Đợt thu phí",
+    path: "/fees/periods",
     icon: Banknote,
     allowedRoles: ["admin"],
   },

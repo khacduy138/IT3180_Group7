@@ -7,6 +7,8 @@ import UserManagementPage from './pages/auth/UserManagementPage';
 import InvoiceListPage from './pages/billing/InvoiceListPage';
 import HouseholdDetailPage from './pages/households/HouseholdDetailPage';
 import HouseholdsListPage from './pages/households/HouseholdsListPage';
+import FeeTypeListPage from './pages/fees/FeeTypeListPage';
+import FeePeriodListPage from './pages/fees/FeePeriodListPage';
 
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem('token');
@@ -79,6 +81,26 @@ function App() {
               <HouseholdDetailPage />
             </ProtectedRoute>
           }
+        />
+        <Route
+          path="/fees/types"
+          element={
+            <ProtectedRoute>
+              <FeeTypeListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/fees/periods"
+          element={
+            <ProtectedRoute>
+              <FeePeriodListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/fees"
+          element={<Navigate to="/fees/types" replace />}
         />
       </Routes>
     </BrowserRouter>
