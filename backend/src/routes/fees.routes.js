@@ -4,133 +4,63 @@ const express = require('express');
 
 const router = express.Router();
 
-/*
- * Module 3 — Fee Management Routes
- *
- * Mounted at: app.use('/api', feesRoutes)
- *
- * Resulting endpoints:
- *   /api/fee-types
- *   /api/fee-periods
- *   /api/utility-invoices
- */
-
 const authenticate = require('../middleware/authenticate');
-router.use(authenticate);
+const feesController = require('../controllers/fees.controller');
 
-function notImplemented(resource, action) {
-  return (req, res) => {
-    res.status(501).json({
-      success: false,
-      message: `${action} ${resource} - to be implemented`,
-    });
-  };
-}
+router.use(authenticate);
 
 /* -------------------------------------------------------------------------- */
 /* Fee Types                                                                  */
 /* -------------------------------------------------------------------------- */
 
-router.get(
-  '/fee-types',
-  notImplemented('fee types', 'Get')
-);
+router.get('/fee-types', feesController.listFeeTypes);
 
-router.post(
-  '/fee-types',
-  notImplemented('fee type', 'Create')
-);
+router.post('/fee-types', feesController.createFeeType);
 
-router.get(
-  '/fee-types/:id',
-  notImplemented('fee type detail', 'Get')
-);
+router.get('/fee-types/:id', feesController.getFeeType);
 
-router.patch(
-  '/fee-types/:id',
-  notImplemented('fee type', 'Update')
-);
+router.patch('/fee-types/:id', feesController.updateFeeType);
 
-router.delete(
-  '/fee-types/:id',
-  notImplemented('fee type', 'Deactivate')
-);
-
-/* -------------------------------------------------------------------------- */
-/* Fee Type Price History                                                     */
-/* -------------------------------------------------------------------------- */
+router.delete('/fee-types/:id', feesController.deactivateFeeType);
 
 router.get(
   '/fee-types/:id/price-history',
-  notImplemented('fee type price history', 'Get')
+  feesController.listFeeTypePriceHistory
 );
 
 router.post(
   '/fee-types/:id/price-history',
-  notImplemented('fee type price version', 'Create')
+  feesController.createFeeTypePriceVersion
 );
 
 /* -------------------------------------------------------------------------- */
 /* Fee Periods                                                                */
 /* -------------------------------------------------------------------------- */
 
-router.get(
-  '/fee-periods',
-  notImplemented('fee periods', 'Get')
-);
+router.get('/fee-periods', feesController.listFeePeriods);
 
-router.post(
-  '/fee-periods',
-  notImplemented('fee period', 'Create')
-);
+router.post('/fee-periods', feesController.createFeePeriod);
 
-router.get(
-  '/fee-periods/:id',
-  notImplemented('fee period detail', 'Get')
-);
+router.get('/fee-periods/:id', feesController.getFeePeriod);
 
-router.patch(
-  '/fee-periods/:id',
-  notImplemented('fee period', 'Update')
-);
+router.patch('/fee-periods/:id', feesController.updateFeePeriod);
 
-router.post(
-  '/fee-periods/:id/activate',
-  notImplemented('fee period', 'Activate')
-);
+router.post('/fee-periods/:id/activate', feesController.activateFeePeriod);
 
-router.delete(
-  '/fee-periods/:id',
-  notImplemented('draft fee period', 'Delete')
-);
+router.delete('/fee-periods/:id', feesController.deleteDraftFeePeriod);
 
 /* -------------------------------------------------------------------------- */
 /* Utility Invoices                                                           */
 /* -------------------------------------------------------------------------- */
 
-router.get(
-  '/utility-invoices',
-  notImplemented('utility invoices', 'Get')
-);
+router.get('/utility-invoices', feesController.listUtilityInvoices);
 
-router.post(
-  '/utility-invoices',
-  notImplemented('utility invoice', 'Create')
-);
+router.post('/utility-invoices', feesController.createUtilityInvoice);
 
-router.patch(
-  '/utility-invoices/:id',
-  notImplemented('utility invoice', 'Update')
-);
+router.patch('/utility-invoices/:id', feesController.updateUtilityInvoice);
 
-router.post(
-  '/utility-invoices/:id/confirm',
-  notImplemented('utility invoice', 'Confirm')
-);
+router.post('/utility-invoices/:id/confirm', feesController.confirmUtilityInvoice);
 
-router.delete(
-  '/utility-invoices/:id',
-  notImplemented('draft utility invoice', 'Delete')
-);
+router.delete('/utility-invoices/:id', feesController.deleteDraftUtilityInvoice);
 
 module.exports = router;

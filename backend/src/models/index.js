@@ -9,8 +9,10 @@ const Resident = require('./Resident');
 const HouseholdMember = require('./HouseholdMember');
 const Vehicle = require('./Vehicle');
 const FeeType = require('./FeeType');
+const FeeTypePriceHistory = require('./FeeTypePriceHistory');
 const FeePeriod = require('./FeePeriod');
 const PeriodFee = require('./PeriodFee');
+const UtilityInvoice = require('./UtilityInvoice');
 const FeeUsage = require('./FeeUsage');
 const Invoice = require('./Invoice');
 const InvoiceItem = require('./InvoiceItem');
@@ -84,6 +86,37 @@ FeePeriod.hasMany(PeriodFee, { as: 'period_fees', foreignKey: 'fee_period_id' })
 FeeType.hasMany(PeriodFee, { as: 'period_fees', foreignKey: 'fee_type_id' });
 PeriodFee.belongsTo(FeePeriod, { as: 'fee_period', foreignKey: 'fee_period_id' });
 PeriodFee.belongsTo(FeeType, { as: 'fee_type', foreignKey: 'fee_type_id' });
+FeeType.hasMany(FeeTypePriceHistory, {
+  as: 'price_history',
+  foreignKey: 'fee_type_id',
+});
+FeeTypePriceHistory.belongsTo(FeeType, {
+  as: 'fee_type',
+  foreignKey: 'fee_type_id',
+});
+FeeTypePriceHistory.belongsTo(User, {
+  as: 'created_by_user',
+  foreignKey: 'created_by',
+});
+UtilityInvoice.belongsTo(FeePeriod, {
+  as: 'fee_period',
+  foreignKey: 'fee_period_id',
+});
+
+UtilityInvoice.belongsTo(Household, {
+  as: 'household',
+  foreignKey: 'household_id',
+});
+
+FeePeriod.hasMany(UtilityInvoice, {
+  as: 'utility_invoices',
+  foreignKey: 'fee_period_id',
+});
+
+Household.hasMany(UtilityInvoice, {
+  as: 'utility_invoices',
+  foreignKey: 'household_id',
+});
 
 /* ── Module 4: Billing & Payment ───────────────────────────── */
 
@@ -126,4 +159,6 @@ module.exports = {
   Invoice,
   InvoiceItem,
   Payment,
+  FeeTypePriceHistory,
+  UtilityInvoice,
 };
