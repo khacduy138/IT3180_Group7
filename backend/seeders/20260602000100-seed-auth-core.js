@@ -33,12 +33,24 @@ const permissions = [
   'fees:write',
   'billing:read',
   'billing:write',
+  'invoices:read',
+  'invoices:write',
+  'payments:read',
+  'payments:write',
   'reports:read',
 ];
 
 const rolePermissions = {
   admin: permissions,
-  accountant: ['billing:read', 'billing:write', 'fees:read'],
+  accountant: [
+    'billing:read',
+    'billing:write',
+    'invoices:read',
+    'invoices:write',
+    'payments:read',
+    'payments:write',
+    'fees:read',
+  ],
   staff: [
     'households:read',
     'households:write',
