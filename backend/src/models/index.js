@@ -95,19 +95,24 @@ PeriodFee.hasMany(FeeUsage, { as: 'fee_usages', foreignKey: 'period_fee_id' });
 
 Invoice.belongsTo(Household, { as: 'household', foreignKey: 'household_id' });
 Invoice.belongsTo(FeePeriod, { as: 'fee_period', foreignKey: 'fee_period_id' });
-Invoice.belongsTo(User, { as: 'created_by_user', foreignKey: 'created_by' });
+Invoice.belongsTo(User, { as: 'creator', foreignKey: 'created_by' });
 Household.hasMany(Invoice, { as: 'invoices', foreignKey: 'household_id' });
 FeePeriod.hasMany(Invoice, { as: 'invoices', foreignKey: 'fee_period_id' });
+User.hasMany(Invoice, { as: 'created_invoices', foreignKey: 'created_by' });
 
 Invoice.hasMany(InvoiceItem, { as: 'invoice_items', foreignKey: 'invoice_id' });
 InvoiceItem.belongsTo(Invoice, { as: 'invoice', foreignKey: 'invoice_id' });
 InvoiceItem.belongsTo(FeeType, { as: 'fee_type', foreignKey: 'fee_type_id' });
+FeeType.hasMany(InvoiceItem, { as: 'invoice_items', foreignKey: 'fee_type_id' });
 InvoiceItem.belongsTo(FeeUsage, { as: 'fee_usage', foreignKey: 'fee_usage_id' });
+FeeUsage.hasMany(InvoiceItem, { as: 'invoice_items', foreignKey: 'fee_usage_id' });
 InvoiceItem.belongsTo(Vehicle, { as: 'vehicle', foreignKey: 'vehicle_id' });
+Vehicle.hasMany(InvoiceItem, { as: 'invoice_items', foreignKey: 'vehicle_id' });
 
 Invoice.hasMany(Payment, { as: 'payments', foreignKey: 'invoice_id' });
 Payment.belongsTo(Invoice, { as: 'invoice', foreignKey: 'invoice_id' });
-Payment.belongsTo(User, { as: 'created_by_user', foreignKey: 'created_by' });
+Payment.belongsTo(User, { as: 'creator', foreignKey: 'created_by' });
+User.hasMany(Payment, { as: 'created_payments', foreignKey: 'created_by' });
 
 module.exports = {
   sequelize,
