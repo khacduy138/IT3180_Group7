@@ -1556,3 +1556,755 @@ Khi kỳ phí đã ở trạng thái `active`, Module 3 không cho phép thay đ
 | Route skeleton cho Module 3 | Completed | Đã test các route GET chính tại `/api/...` |
 | Middleware `authenticate` | Pending Module 1 | `src/middleware/authenticate.js` hiện vẫn là placeholder |
 | Response format với Module 4 | Pending confirmation | Chờ Chinh xác nhận endpoint `GET /api/fee-periods/:id` |
+
+---
+
+# 14. Module 4 Billing API Contract
+
+## 14.1. Scope and Implementation Status
+
+Module 4 creates invoices for households, stores immutable invoice line snapshots,
+records payments, and tracks payment completion.
+
+Base path:
+
+```http
+/api/billing
+```
+
+The following endpoints are currently registered:
+
+| Method | Endpoint | Status | Required Permission |
+| --- | --- | --- | --- |
+| `GET` | `/api/billing` | Implemented | `invoices:read` |
+| `GET` | `/api/billing/:id` | Implemented | `invoices:read` |
+| `POST` | `/api/billing` | Implemented | `invoices:write` |
+| `POST` | `/api/billing/:id/payments` | Implemented | `payments:write` |
+| `POST` | `/api/billing/generate` | Proposed | `invoices:write` |
+
+Authentication and authorization are contract requirements. The current
+`billing.routes.js` does not yet attach `authenticate` or `authorize`
+middleware, so the permissions in this section must be enforced before release.
+
+Current controller responses expose Sequelize field names in `snake_case`.
+Examples in this section match the implemented wire response. A later migration
+to the project-wide `camelCase` convention is a breaking response change and
+must be versioned or coordinated with clients.
+
+## 14.2. Billing Flow
+
+1. An accountant selects an active fee period.
+2. Billing reads the fee period configuration and frozen price versions from
+   Module 3.
+3. Billing reads household vehicles from Module 2 when a vehicle-based fee is
+   configured.
+4. Billing reads confirmed utility invoices or another confirmed utility data
+   source from Module 3.
+5. Billing calculates invoice items and snapshots quantity, unit price, source,
+   and line total.
+6. Billing creates one invoice per household and fee period.
+7. Payments are recorded against the invoice.
+8. The invoice status moves from `PENDING` to `PARTIAL` to `PAID` according to
+   the total amount paid.
+
+The database unique constraint on `(household_id, fee_period_id)` makes invoice
+generation idempotent at the household and fee period boundary.
+
+## 14.3. Invoice State Machine
+
+```text
+PENDING -> PARTIAL -> PAID
+PENDING -> PAID
+```
+
+| Status | Meaning | Transition Rule |
+| --- | --- | --- |
+| `PENDING` | No positive payment has been recorded. | Initial status when an invoice is created. |
+| `PARTIAL` | Total paid is greater than `0` and less than `total_amount`. | Set after a payment leaves an outstanding balance. |
+| `PAID` | Total paid is greater than or equal to `total_amount`. | Set after a payment covers the invoice balance. |
+
+Status is derived from persisted payments:
+
+```text
+totalPaid = sum(payments.amount)
+
+if totalPaid <= 0:
+  status = PENDING
+else if totalPaid < invoice.total_amount:
+  status = PARTIAL
+else:
+  status = PAID
+```
+
+The current endpoint accepts overpayment. An overpaid invoice remains `PAID`.
+Refunds, payment deletion, payment reversal, and backward status transitions are
+outside the current contract.
+
+## 14.4. Database Schema Summary
+
+### `invoices`
+
+One invoice exists for each household and fee period.
+
+| Column | Type | Contract |
+| --- | --- | --- |
+| `id` | INTEGER | Primary key, auto-increment |
+| `uuid` | `CHAR(36)` | Required, unique public identifier |
+| `invoice_number` | STRING | Required, unique human-readable number |
+| `household_id` | INTEGER | Required FK -> `households.id`, delete restricted |
+| `fee_period_id` | INTEGER | Required FK -> `fee_periods.id`, delete restricted |
+| `total_amount` | `DECIMAL(12,2)` | Required, defaults to `0` |
+| `status` | STRING | Required, one of `PENDING`, `PARTIAL`, `PAID` |
+| `due_date` | DATE | Optional |
+| `created_by` | INTEGER | Required FK -> `users.id`, delete restricted |
+| `created_at` | DATETIME | Required |
+| `updated_at` | DATETIME | Required |
+
+Indexes:
+
+```text
+UNIQUE(household_id, fee_period_id)
+INDEX(fee_period_id)
+INDEX(status)
+```
+
+### `invoice_items`
+
+Each row is an immutable billing snapshot. Historical rows must not be
+recalculated when a fee definition or price changes.
+
+| Column | Type | Contract |
+| --- | --- | --- |
+| `id` | INTEGER | Primary key, auto-increment |
+| `invoice_id` | INTEGER | Required FK -> `invoices.id`, delete cascades |
+| `fee_type_id` | INTEGER | Required FK -> `fee_types.id`, delete restricted |
+| `fee_usage_id` | INTEGER | Optional FK -> `fee_usages.id`, set null on delete |
+| `vehicle_id` | INTEGER | Optional FK -> `vehicles.id`, set null on delete |
+| `quantity` | `DECIMAL(12,2)` | Required, greater than `0` |
+| `price_snapshot` | `DECIMAL(12,2)` | Required, greater than or equal to `0` |
+| `line_total` | `DECIMAL(12,2)` | Required, `quantity * price_snapshot` |
+| `source` | STRING | Required, defaults to `MANUAL_INPUT` in the current create API |
+| `description` | STRING | Optional |
+| `created_at` | DATETIME | Required |
+
+### `payments`
+
+Payments are append-only records against an invoice.
+
+| Column | Type | Contract |
+| --- | --- | --- |
+| `id` | INTEGER | Primary key, auto-increment |
+| `invoice_id` | INTEGER | Required FK -> `invoices.id`, delete restricted |
+| `amount` | `DECIMAL(12,2)` | Required, greater than `0` |
+| `payment_method` | STRING | Required |
+| `payment_date` | DATETIME | Required |
+| `note` | STRING | Optional |
+| `created_by` | INTEGER | Required FK -> `users.id`, delete restricted |
+| `created_at` | DATETIME | Required |
+
+## 14.5. Common Billing Response Rules
+
+All implemented endpoints use the common success and error envelopes defined at
+the start of this document.
+
+Example error:
+
+```json
+{
+  "success": false,
+  "statusCode": 400,
+  "message": "Invalid householdId",
+  "errors": [
+    {
+      "field": "householdId",
+      "code": "VAL_002",
+      "message": "householdId must be a number"
+    }
+  ],
+  "timestamp": "2026-06-07T10:30:45.123Z"
+}
+```
+
+Common authorization responses:
+
+| Status | Condition |
+| --- | --- |
+| `401 Unauthorized` | Bearer token is missing, invalid, expired, or revoked. |
+| `403 Forbidden` | The authenticated user lacks the required permission. |
+| `500 Internal Server Error` | An unexpected database or server error occurs. |
+
+## 14.6. List Invoices
+
+```http
+GET /api/billing
+```
+
+Purpose: Return invoices in descending creation order with invoice items,
+payments, household data, and fee period data.
+
+Permission: `invoices:read`
+
+### Query Parameters
+
+| Parameter | Type | Required | Default | Rules |
+| --- | --- | --- | --- | --- |
+| `pageNumber` | number | No | `1` | Minimum `1` |
+| `pageSize` | number | No | `20` | Minimum `1`, maximum `100` |
+| `status` | string | No | None | Intended values: `PENDING`, `PARTIAL`, `PAID` |
+| `householdId` | number | No | None | Must be numeric |
+| `feePeriodId` | number | No | None | Must be numeric |
+
+Request body: None.
+
+### Success Response
+
+Status: `200 OK`
+
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "message": "Invoices retrieved successfully",
+  "data": [
+    {
+      "id": 42,
+      "uuid": "5c43df4e-dca4-4a7e-9dd6-4344245e63b5",
+      "invoice_number": "INV-MONTHLY_2026_06-A101-4821",
+      "household_id": 10,
+      "fee_period_id": 6,
+      "total_amount": "350000.00",
+      "status": "PARTIAL",
+      "due_date": "2026-07-10",
+      "created_by": 3,
+      "InvoiceItems": [],
+      "Payments": [],
+      "Household": {},
+      "FeePeriod": {}
+    }
+  ],
+  "pagination": {
+    "pageNumber": 1,
+    "pageSize": 20,
+    "totalRecords": 1,
+    "totalPages": 1,
+    "hasNextPage": false,
+    "hasPreviousPage": false
+  },
+  "timestamp": "2026-06-07T10:30:45.123Z"
+}
+```
+
+Association property names depend on the registered Sequelize aliases. Clients
+must use the aliases exposed by the running model configuration.
+
+### Error Responses
+
+| Status | Message | Condition |
+| --- | --- | --- |
+| `400 Bad Request` | `Invalid householdId` | `householdId` is not numeric |
+| `400 Bad Request` | `Invalid feePeriodId` | `feePeriodId` is not numeric |
+| `401 Unauthorized` | Authentication error | Token failure |
+| `403 Forbidden` | Authorization error | Missing `invoices:read` |
+| `500 Internal Server Error` | Server error | Query or database failure |
+
+Current limitation: `status`, `pageNumber`, and `pageSize` are coerced by the
+controller but are not strictly validated against an enum or integer-only
+format.
+
+## 14.7. Get Invoice Detail
+
+```http
+GET /api/billing/:id
+```
+
+Purpose: Return one invoice with its invoice items, payments, household, and fee
+period.
+
+Permission: `invoices:read`
+
+### Path Parameters
+
+| Parameter | Type | Required | Rules |
+| --- | --- | --- | --- |
+| `id` | integer | Yes | Invoice primary key |
+
+Query parameters: None.
+
+Request body: None.
+
+### Success Response
+
+Status: `200 OK`
+
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "message": "Invoice retrieved successfully",
+  "data": {
+    "id": 42,
+    "uuid": "5c43df4e-dca4-4a7e-9dd6-4344245e63b5",
+    "invoice_number": "INV-MONTHLY_2026_06-A101-4821",
+    "household_id": 10,
+    "fee_period_id": 6,
+    "total_amount": "350000.00",
+    "status": "PARTIAL",
+    "due_date": "2026-07-10",
+    "created_by": 3,
+    "InvoiceItems": [
+      {
+        "id": 80,
+        "invoice_id": 42,
+        "fee_type_id": 2,
+        "fee_usage_id": null,
+        "vehicle_id": null,
+        "quantity": "1.00",
+        "price_snapshot": "300000.00",
+        "line_total": "300000.00",
+        "source": "MANUAL_INPUT",
+        "description": "Monthly service fee"
+      }
+    ],
+    "Payments": [
+      {
+        "id": 15,
+        "invoice_id": 42,
+        "amount": "100000.00",
+        "payment_method": "bank_transfer",
+        "payment_date": "2026-06-07T08:00:00.000Z",
+        "note": null,
+        "created_by": 3
+      }
+    ],
+    "Household": {},
+    "FeePeriod": {}
+  },
+  "timestamp": "2026-06-07T10:30:45.123Z"
+}
+```
+
+### Error Responses
+
+| Status | Message | Condition |
+| --- | --- | --- |
+| `404 Not Found` | `Invoice not found` | No invoice matches the numeric conversion of `id` |
+| `401 Unauthorized` | Authentication error | Token failure |
+| `403 Forbidden` | Authorization error | Missing `invoices:read` |
+| `500 Internal Server Error` | Server error | Invalid identifier handling or database failure |
+
+Current limitation: the controller does not explicitly validate `id`. A
+non-numeric value reaches the database lookup and may result in `404` or a
+database-specific `500`.
+
+## 14.8. Create Invoice
+
+```http
+POST /api/billing
+```
+
+Purpose: Create one invoice and its item snapshots for one household and one fee
+period.
+
+Permission: `invoices:write`
+
+Path parameters: None.
+
+Query parameters: None.
+
+### Request Body
+
+```json
+{
+  "householdId": 10,
+  "feePeriodId": 6,
+  "dueDate": "2026-07-10",
+  "createdBy": 3,
+  "items": [
+    {
+      "feeTypeId": 2,
+      "feeUsageId": null,
+      "vehicleId": null,
+      "quantity": 1,
+      "priceSnapshot": 300000,
+      "source": "MANUAL_INPUT",
+      "description": "Monthly service fee"
+    },
+    {
+      "feeTypeId": 5,
+      "vehicleId": 21,
+      "quantity": 1,
+      "priceSnapshot": 50000,
+      "source": "VEHICLE",
+      "description": "Motorbike parking fee"
+    }
+  ]
+}
+```
+
+| Field | Type | Required | Rules |
+| --- | --- | --- | --- |
+| `householdId` | integer | Yes | Must reference an existing household |
+| `feePeriodId` | integer | Yes | Must reference an existing fee period |
+| `dueDate` | date string | No | Stored as a date; current controller does not explicitly validate it |
+| `createdBy` | integer | Yes | Must be an integer and reference a user |
+| `items` | array | No | Defaults to an empty array |
+| `items[].feeTypeId` | integer | Yes per item | Must reference an existing fee type |
+| `items[].feeUsageId` | integer or null | No | Optional source record |
+| `items[].vehicleId` | integer or null | No | Optional vehicle source |
+| `items[].quantity` | number | Yes per item | Finite and greater than `0` |
+| `items[].priceSnapshot` | number | Yes per item | Finite and greater than or equal to `0` |
+| `items[].source` | string | No | Defaults to `MANUAL_INPUT` |
+| `items[].description` | string or null | No | Human-readable line description |
+
+The server calculates each `line_total` and `total_amount`; clients must not send
+or control those values.
+
+```text
+line_total = round(quantity * priceSnapshot, 2)
+total_amount = sum(line_total)
+```
+
+### Success Response
+
+Status: `201 Created`
+
+```json
+{
+  "success": true,
+  "statusCode": 201,
+  "message": "Invoice created successfully",
+  "data": {
+    "id": 42,
+    "uuid": "5c43df4e-dca4-4a7e-9dd6-4344245e63b5",
+    "invoice_number": "INV-MONTHLY_2026_06-A101-4821",
+    "household_id": 10,
+    "fee_period_id": 6,
+    "total_amount": "350000.00",
+    "status": "PENDING",
+    "due_date": "2026-07-10",
+    "created_by": 3,
+    "InvoiceItems": [
+      {
+        "fee_type_id": 2,
+        "quantity": "1.00",
+        "price_snapshot": "300000.00",
+        "line_total": "300000.00",
+        "source": "MANUAL_INPUT"
+      }
+    ],
+    "Household": {},
+    "FeePeriod": {}
+  },
+  "timestamp": "2026-06-07T10:30:45.123Z"
+}
+```
+
+### Error Responses
+
+| Status | Message | Condition |
+| --- | --- | --- |
+| `400 Bad Request` | `Missing required fields` | `householdId`, `feePeriodId`, or `createdBy` is missing |
+| `400 Bad Request` | `Invalid createdBy` | `createdBy` is not an integer |
+| `400 Bad Request` | `Invalid fee type in items` | An item references an unknown fee type |
+| `400 Bad Request` | `Invalid item values` | Quantity or price is outside the accepted range |
+| `404 Not Found` | `Household not found` | Household does not exist |
+| `404 Not Found` | `Fee period not found` | Fee period does not exist |
+| `409 Conflict` | `Invoice already exists for this household and fee period` | Unique invoice boundary already exists |
+| `401 Unauthorized` | Authentication error | Token failure |
+| `403 Forbidden` | Authorization error | Missing `invoices:write` |
+| `500 Internal Server Error` | Server error | Constraint, invoice number collision, or database failure |
+
+Atomicity requirement: creation of the invoice, all invoice items, and the final
+invoice total must commit in one database transaction. Any validation or write
+failure must roll back the entire operation. The current controller implements
+this transaction boundary.
+
+## 14.9. Record Payment
+
+```http
+POST /api/billing/:id/payments
+```
+
+Purpose: Append a payment to an invoice and recalculate its payment status.
+
+Permission: `payments:write`
+
+### Path Parameters
+
+| Parameter | Type | Required | Rules |
+| --- | --- | --- | --- |
+| `id` | integer | Yes | Positive invoice primary key |
+
+Query parameters: None.
+
+### Request Body
+
+```json
+{
+  "amount": 100000,
+  "paymentMethod": "bank_transfer",
+  "paymentDate": "2026-06-07T08:00:00.000Z",
+  "note": "First installment",
+  "createdBy": 3
+}
+```
+
+| Field | Type | Required | Rules |
+| --- | --- | --- | --- |
+| `amount` | number | Yes | Finite and greater than `0` |
+| `paymentMethod` | string | Yes | Non-empty; examples: `cash`, `bank_transfer` |
+| `paymentDate` | date string | Yes | Must be parseable as a valid date |
+| `note` | string or null | No | Optional payment note |
+| `createdBy` | integer | Yes | Must be an integer and reference a user |
+
+### Success Response
+
+Status: `201 Created`
+
+```json
+{
+  "success": true,
+  "statusCode": 201,
+  "message": "Payment recorded successfully",
+  "data": {
+    "id": 15,
+    "invoice_id": 42,
+    "amount": "100000.00",
+    "payment_method": "bank_transfer",
+    "payment_date": "2026-06-07T08:00:00.000Z",
+    "note": "First installment",
+    "created_by": 3,
+    "created_at": "2026-06-07T10:30:45.123Z"
+  },
+  "timestamp": "2026-06-07T10:30:45.123Z"
+}
+```
+
+The response returns the created payment. Clients that need the new invoice
+status must call `GET /api/billing/:id`.
+
+### Error Responses
+
+| Status | Message | Condition |
+| --- | --- | --- |
+| `400 Bad Request` | `Missing or invalid required fields` | Invalid `id`, amount, method, date, or creator |
+| `404 Not Found` | `Invoice not found` | Invoice does not exist |
+| `401 Unauthorized` | Authentication error | Token failure |
+| `403 Forbidden` | Authorization error | Missing `payments:write` |
+| `500 Internal Server Error` | Server error | Payment insert or invoice update failure |
+
+Atomicity requirement: payment insertion, total-paid calculation, and invoice
+status update must use one database transaction. The invoice row should be
+locked while totals are calculated to prevent concurrent payments from
+overwriting status decisions.
+
+Current implementation gap: `createPayment` inserts the payment and saves the
+invoice status without a transaction or row lock. This does not yet satisfy the
+required production transaction strategy.
+
+## 14.10. Proposed Batch Invoice Generation
+
+```http
+POST /api/billing/generate
+```
+
+Status: Proposed, not currently registered.
+
+Purpose: Generate invoices and invoice items for all eligible households in one
+fee period by combining Module 2 and Module 3 data.
+
+Permission: `invoices:write`
+
+Route ordering requirement: when implemented, `/generate` must be registered
+before `/:id` so Express does not interpret `generate` as an invoice identifier.
+
+Path parameters: None.
+
+Query parameters: None.
+
+### Request Body
+
+```json
+{
+  "feePeriodId": 6,
+  "dueDate": "2026-07-10",
+  "createdBy": 3,
+  "householdIds": [10, 11, 12],
+  "skipExisting": true
+}
+```
+
+| Field | Type | Required | Rules |
+| --- | --- | --- | --- |
+| `feePeriodId` | integer | Yes | Existing active fee period |
+| `dueDate` | date string | No | Defaults to the fee period due date when available |
+| `createdBy` | integer | Yes | Authenticated user should be the authoritative source |
+| `householdIds` | integer array | No | If omitted, generate for all eligible households |
+| `skipExisting` | boolean | No | Default `true`; skip existing household-period invoices |
+
+### Processing Rules
+
+1. Load and validate the active fee period and its frozen fee configuration.
+2. Resolve the eligible household set.
+3. Load household vehicles for vehicle-based fee types.
+4. Load only confirmed utility records for the selected fee period.
+5. Calculate all line items with decimal-safe arithmetic.
+6. Create one invoice and its items for each household.
+7. Do not duplicate an invoice for the same household and fee period.
+8. Return a deterministic summary of created, skipped, and failed households.
+
+### Success Response
+
+Status: `201 Created` when at least one invoice is created.
+
+```json
+{
+  "success": true,
+  "statusCode": 201,
+  "message": "Invoice generation completed",
+  "data": {
+    "feePeriodId": 6,
+    "requestedHouseholds": 3,
+    "createdCount": 2,
+    "skippedCount": 1,
+    "failedCount": 0,
+    "createdInvoiceIds": [42, 43],
+    "skipped": [
+      {
+        "householdId": 12,
+        "reason": "INVOICE_ALREADY_EXISTS"
+      }
+    ],
+    "failed": []
+  },
+  "timestamp": "2026-06-07T10:30:45.123Z"
+}
+```
+
+Status: `200 OK` when the request succeeds but every eligible invoice is skipped
+because it already exists and `skipExisting` is `true`.
+
+### Error Responses
+
+| Status | Code or Message | Condition |
+| --- | --- | --- |
+| `400 Bad Request` | `VALIDATION_ERROR` | Request fields are invalid |
+| `404 Not Found` | `FEE_PERIOD_NOT_FOUND` | Fee period does not exist |
+| `409 Conflict` | `FEE_PERIOD_NOT_ACTIVE` | Fee period is not active |
+| `409 Conflict` | `INVOICE_ALREADY_EXISTS` | Existing invoice found while `skipExisting` is `false` |
+| `422 Unprocessable Entity` | `BILLING_INPUT_NOT_CONFIRMED` | Required utility input is missing or unconfirmed |
+| `502 Bad Gateway` | `DEPENDENCY_ERROR` | Module 2 or Module 3 cannot provide required data |
+| `401 Unauthorized` | Authentication error | Token failure |
+| `403 Forbidden` | Authorization error | Missing `invoices:write` |
+| `500 Internal Server Error` | Server error | Unexpected generation or database failure |
+
+### Batch Transaction Strategy
+
+Dependency reads and fee calculations should complete before invoice writes
+begin. The preferred write boundary is one transaction per household:
+
+```text
+for each household:
+  begin transaction
+  check household and fee period uniqueness
+  create invoice
+  create all invoice_items
+  update invoice total_amount
+  commit
+```
+
+If one household fails, its transaction is rolled back without leaving a header
+or partial item set. Other household transactions may continue, and the failure
+is included in the batch summary. This avoids one long transaction locking all
+households while still guaranteeing that every individual invoice is atomic.
+
+The unique database index remains the final concurrency guard. A duplicate key
+race must be reported as skipped when `skipExisting` is `true`, or as a conflict
+when it is `false`.
+
+## 14.11. Integration Dependencies
+
+### Module 2: Household Vehicles
+
+```http
+GET /households/:id/vehicles
+```
+
+Billing uses the returned vehicle `id` and `type` to generate vehicle-based
+invoice items. Generated lines should store `vehicle_id`, quantity, frozen unit
+price, and a source such as `VEHICLE`.
+
+Required behavior:
+
+- `404` means the household is invalid and generation for that household fails.
+- An empty vehicle list is valid and produces no vehicle fee item.
+- Vehicle rates must come from the selected fee period configuration, not from
+  hard-coded values in Billing.
+
+### Module 3: Fee Period Detail
+
+```http
+GET /fee-periods/:id
+```
+
+Billing requires the period status, start date, end date, due date, fee items,
+calculation type, frozen unit price, price version identifier, and required flag.
+Automatic batch generation is allowed only for an active fee period.
+
+The price used in an invoice item must be copied to `price_snapshot`. Existing
+invoice items must never change when Module 3 later changes a fee type or price.
+
+### Module 3: Utility Data
+
+Billing requires either:
+
+- Module 3 utility invoice records with `status = confirmed`; or
+- another explicitly versioned and confirmed utility data contract.
+
+Draft or mutable utility data must not be invoiced. Billing maps each confirmed
+utility amount to an invoice item with its fee type, usage reference where
+available, quantity, price snapshot, line total, source, and description.
+
+The exact utility read endpoint must support filtering by both `feePeriodId` and
+`householdId`. The current Module 3 contract provides:
+
+```http
+GET /api/utility-invoices?feePeriodId={feePeriodId}&householdId={householdId}&status=confirmed
+```
+
+## 14.12. Transaction Requirements Summary
+
+| Operation | Required Boundary | Current Status |
+| --- | --- | --- |
+| Create one invoice | Invoice header + all items + final total in one transaction | Implemented |
+| Record one payment | Payment insert + total calculation + status update in one transaction with invoice row lock | Not implemented |
+| Generate a batch | Preload dependencies, then one atomic transaction per household | Proposed |
+
+All money calculations must use decimal-safe arithmetic. JavaScript binary
+floating-point values must not be trusted for final financial totals.
+
+## 14.13. Definition of Done
+
+- [x] Module 4 overview and end-to-end billing flow are documented.
+- [x] Invoice states and transitions are limited to `PENDING`, `PARTIAL`, and `PAID`.
+- [x] `invoices`, `invoice_items`, and `payments` schemas match the migration.
+- [x] All four implemented Billing endpoints match route and controller behavior.
+- [x] Every endpoint defines purpose, permission, parameters, request body, success response, errors, and status codes.
+- [x] `POST /api/billing/generate` is documented as proposed, including its route ordering requirement.
+- [x] Module 2 vehicle integration is documented against `GET /households/:id/vehicles`.
+- [x] Module 3 fee period integration is documented against `GET /fee-periods/:id`.
+- [x] Confirmed Module 3 utility data requirements are documented.
+- [x] Invoice creation atomicity is documented and matches the current implementation.
+- [x] Payment and batch transaction requirements are documented.
+- [x] Duplicate household and fee period invoice handling is documented.
+- [x] Decimal-safe financial calculation requirements are documented.
+
+### Implementation gaps for follow-up issues
+
+- [ ] Billing routes enforce authentication and the documented permissions.
+- [ ] `POST /api/billing/generate` is implemented and registered before `/:id`.
+- [ ] Only confirmed Module 3 utility data can become invoice items during generation.
+- [ ] Payment insertion and invoice status update are made atomic with row locking.
+- [ ] Batch generation uses the documented per-household transaction strategy.
+- [ ] Financial calculations use decimal-safe arithmetic.
+- [ ] Contract tests cover success, validation, not found, conflict, authorization, dependency failure, and rollback cases.

@@ -76,18 +76,10 @@ const listInvoices = async (req, res, next) => {
       where,
       distinct: true,
       include: [
-        {
-          model: InvoiceItem,
-        },
-        {
-          model: Payment,
-        },
-        {
-          model: Household,
-        },
-        {
-          model: FeePeriod,
-        },
+        { model: InvoiceItem, as: 'invoice_items' },
+        { model: Payment, as: 'payments' },
+        { model: Household, as: 'household' },
+        { model: FeePeriod, as: 'fee_period' },
       ],
       order: [['created_at', 'DESC']],
       limit: pageSize,
@@ -115,18 +107,10 @@ const getInvoice = async (req, res, next) => {
   try {
     const invoice = await Invoice.findByPk(Number(req.params.id), {
       include: [
-        {
-          model: InvoiceItem,
-        },
-        {
-          model: Payment,
-        },
-        {
-          model: Household,
-        },
-        {
-          model: FeePeriod,
-        },
+        { model: InvoiceItem, as: 'invoice_items' },
+        { model: Payment, as: 'payments' },
+        { model: Household, as: 'household' },
+        { model: FeePeriod, as: 'fee_period' },
       ],
     });
 
@@ -278,7 +262,11 @@ const createInvoice = async (req, res, next) => {
     await transaction.commit();
 
     const createdInvoice = await Invoice.findByPk(invoice.id, {
-      include: [InvoiceItem, Household, FeePeriod],
+      include: [
+        { model: InvoiceItem, as: 'invoice_items' },
+        { model: Household, as: 'household' },
+        { model: FeePeriod, as: 'fee_period' },
+      ],
     });
 
     return sendSuccess(res, 201, 'Invoice created successfully', createdInvoice);
@@ -289,6 +277,8 @@ const createInvoice = async (req, res, next) => {
 };
 
 const createPayment = async (req, res, next) => {
+  const transaction = await sequelize.transaction();
+
   try {
     const invoiceId = Number(req.params.id);
     const { amount, paymentMethod, paymentDate, note, createdBy } = req.body;
@@ -320,27 +310,38 @@ const createPayment = async (req, res, next) => {
     }
 
     if (errors.length) {
+      await transaction.rollback();
       return sendError(res, 400, 'Missing or invalid required fields', errors);
     }
 
     const invoice = await Invoice.findByPk(invoiceId, {
-      include: [Payment],
+      include: [{ model: Payment, as: 'payments' }],
+      transaction,
     });
 
     if (!invoice) {
+      await transaction.rollback();
       return sendError(res, 404, 'Invoice not found');
     }
 
-    const payment = await Payment.create({
-      invoice_id: invoice.id,
-      amount: amountNumber,
-      payment_method: paymentMethod,
-      payment_date: paymentDate,
-      note: note || null,
-      created_by: createdById,
-    });
+    if (invoice.status === 'PAID') {
+      await transaction.rollback();
+      return sendError(res, 409, 'Invoice is already fully paid');
+    }
 
-    const totalPaid = invoice.Payments.reduce(
+    const payment = await Payment.create(
+      {
+        invoice_id: invoice.id,
+        amount: amountNumber,
+        payment_method: paymentMethod,
+        payment_date: paymentDate,
+        note: note || null,
+        created_by: createdById,
+      },
+      { transaction }
+    );
+
+    const totalPaid = invoice.payments.reduce(
       (sum, current) => sum + Number(current.amount),
       0
     );
@@ -353,10 +354,13 @@ const createPayment = async (req, res, next) => {
       invoice.status = 'PARTIAL';
     }
 
-    await invoice.save();
+    await invoice.save({ transaction });
+
+    await transaction.commit();
 
     return sendSuccess(res, 201, 'Payment recorded successfully', payment);
   } catch (error) {
+    await transaction.rollback();
     return next(error);
   }
 };
