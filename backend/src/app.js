@@ -15,6 +15,8 @@ app.get('/api/health', (req, res) => {
 app.use('/api/auth', require('./routes/auth.routes'));
 app.use('/api/users', require('./routes/users.routes'));
 app.use('/api/households', require('./routes/households.routes'));
+app.use('/api/residents', require('./routes/residents.routes'));
+app.use('/api/demographic-changes', require('./routes/demographicChanges.routes'));
 app.use('/api', require('./routes/fees.routes'));
 app.use('/api/billing', require('./routes/billing.routes'));
 app.use('/api/invoices', require('./routes/invoiceAliases.routes'));
