@@ -29,6 +29,11 @@ const Household = sequelize.define(
       type: DataTypes.STRING,
       allowNull: false,
     },
+    deleted_at: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      defaultValue: null,
+    },
   },
   {
     tableName: 'households',
