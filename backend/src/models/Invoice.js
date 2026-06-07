@@ -11,6 +11,11 @@ const Invoice = sequelize.define(
       autoIncrement: true,
       primaryKey: true,
     },
+    paid_amount: {
+      type: DataTypes.DECIMAL(12, 2),
+      allowNull: false,
+      defaultValue: 0,
+    },
     uuid: {
       type: DataTypes.CHAR(36),
       allowNull: false,

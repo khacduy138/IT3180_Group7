@@ -1,6 +1,10 @@
 import { BrowserRouter, Link, Route, Routes } from 'react-router-dom';
 import { buttonVariants } from './components/ui/Button';
 import UISample from './pages/UISample';
+import LoginPage from './pages/auth/LoginPage';
+import DashboardPage from './pages/dashboard/DashboardPage';
+import UserManagementPage from './pages/auth/UserManagementPage';
+
 
 function HomePage() {
   return (
@@ -10,6 +14,9 @@ function HomePage() {
         <p className="text-lg text-muted-foreground">Apartment Management System</p>
         <Link className={buttonVariants({ variant: 'default' })} to="/uisample">
           Xem sample o day
+        </Link>
+        <Link className={buttonVariants({ variant: 'outline' })} to="/login">
+          Đăng nhập
         </Link>
       </div>
     </div>
@@ -21,7 +28,10 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<HomePage />} />
+        <Route path="/login" element={<LoginPage />} />
         <Route path="/uisample" element={<UISample />} />
+        <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/users" element={<UserManagementPage />} />
       </Routes>
     </BrowserRouter>
   );
