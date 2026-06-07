@@ -16,6 +16,8 @@ const router = express.Router();
  */
 
 const authenticate = require('../middleware/authenticate');
+const authorize = require('../middleware/authorize');
+const billingController = require('../controllers/billing.controller');
 router.use(authenticate);
 
 function notImplemented(resource, action) {
@@ -97,6 +99,12 @@ router.patch(
 router.post(
   '/fee-periods/:id/activate',
   notImplemented('fee period', 'Activate')
+);
+
+router.post(
+  '/fee-periods/:id/generate-invoices',
+  authorize({ permission: 'invoices:write' }),
+  billingController.generateInvoicesForFeePeriod
 );
 
 router.delete(

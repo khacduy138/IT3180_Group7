@@ -17,6 +17,7 @@ app.use('/api/users', require('./routes/users.routes'));
 app.use('/api/households', require('./routes/households.routes'));
 app.use('/api', require('./routes/fees.routes'));
 app.use('/api/billing', require('./routes/billing.routes'));
+app.use('/api/invoices', require('./routes/invoiceAliases.routes'));
 app.use('/api/dashboard', require('./routes/dashboard.routes'));
 
 app.use((req, res) => {

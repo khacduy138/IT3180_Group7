@@ -1,14 +1,19 @@
 const crypto = require('crypto');
+const { Op } = require('sequelize');
 
 const {
   sequelize,
   Household,
+  Vehicle,
   FeePeriod,
   FeeType,
+  PeriodFee,
+  FeeUsage,
   Invoice,
   InvoiceItem,
   Payment,
 } = require('../models');
+const { buildInvoiceItems } = require('../services/invoiceGeneration');
 
 const DEFAULT_PAGE_SIZE = 20;
 
@@ -61,8 +66,9 @@ const listInvoices = async (req, res, next) => {
       where.household_id = householdId;
     }
 
-    if (req.query.feePeriodId !== undefined) {
-      const feePeriodId = Number(req.query.feePeriodId);
+    const periodFilter = req.query.feePeriodId ?? req.query.periodId;
+    if (periodFilter !== undefined) {
+      const feePeriodId = Number(periodFilter);
       if (!Number.isFinite(feePeriodId)) {
         return sendError(res, 400, 'Invalid feePeriodId', [
           { field: 'feePeriodId', code: 'VAL_002', message: 'feePeriodId must be a number' },
@@ -119,6 +125,137 @@ const getInvoice = async (req, res, next) => {
     }
 
     return sendSuccess(res, 200, 'Invoice retrieved successfully', invoice);
+  } catch (error) {
+    return next(error);
+  }
+};
+
+const generateInvoicesForFeePeriod = async (req, res, next) => {
+  try {
+    const feePeriodId = Number(req.params.id);
+
+    if (!Number.isInteger(feePeriodId) || feePeriodId <= 0) {
+      return sendError(res, 400, 'Invalid fee period id', [
+        { field: 'id', code: 'VAL_002', message: 'id must be a positive integer' },
+      ]);
+    }
+
+    const feePeriod = await FeePeriod.findByPk(feePeriodId);
+    if (!feePeriod) {
+      return sendError(res, 404, 'Fee period not found');
+    }
+
+    const existingInvoiceCount = await Invoice.count({
+      where: { fee_period_id: feePeriodId },
+    });
+    if (existingInvoiceCount > 0) {
+      return sendError(res, 409, 'Invoices already exist for this fee period');
+    }
+
+    const [periodFees, households] = await Promise.all([
+      PeriodFee.findAll({
+        where: { fee_period_id: feePeriodId },
+        include: [{ model: FeeType, as: 'fee_type', required: true }],
+        order: [['id', 'ASC']],
+      }),
+      Household.findAll({
+        where: {
+          deleted_at: null,
+          status: { [Op.in]: ['active', 'ACTIVE'] },
+        },
+        include: [
+          {
+            model: Vehicle,
+            as: 'vehicles',
+            where: { is_active: true },
+            required: false,
+          },
+        ],
+        order: [['id', 'ASC']],
+      }),
+    ]);
+
+    const periodFeeIds = periodFees.map((periodFee) => periodFee.id);
+    const feeUsages = periodFeeIds.length
+      ? await FeeUsage.findAll({
+          where: { period_fee_id: periodFeeIds },
+          order: [['id', 'ASC']],
+        })
+      : [];
+    const usagesByHousehold = new Map();
+
+    for (const usage of feeUsages) {
+      const householdUsages = usagesByHousehold.get(usage.household_id) || [];
+      householdUsages.push(usage.get({ plain: true }));
+      usagesByHousehold.set(usage.household_id, householdUsages);
+    }
+
+    const normalizedPeriodFees = periodFees.map((periodFee) =>
+      periodFee.get({ plain: true })
+    );
+    const createdInvoiceIds = [];
+    const failed = [];
+    const dueDate = req.body?.dueDate || feePeriod.end_date || null;
+
+    for (const householdModel of households) {
+      const household = householdModel.get({ plain: true });
+      const transaction = await sequelize.transaction();
+
+      try {
+        const { items, totalAmount } = buildInvoiceItems({
+          household,
+          periodFees: normalizedPeriodFees,
+          feeUsages: usagesByHousehold.get(household.id) || [],
+          vehicles: household.vehicles || [],
+        });
+
+        const invoice = await Invoice.create(
+          {
+            uuid: crypto.randomUUID(),
+            invoice_number: `${buildInvoiceNumber(feePeriod, household)}-${crypto
+              .randomUUID()
+              .slice(0, 8)}`,
+            household_id: household.id,
+            fee_period_id: feePeriod.id,
+            total_amount: totalAmount,
+            paid_amount: 0,
+            status: 'PENDING',
+            due_date: dueDate,
+            created_by: req.user.id,
+          },
+          { transaction }
+        );
+
+        if (items.length) {
+          await InvoiceItem.bulkCreate(
+            items.map((item) => ({ ...item, invoice_id: invoice.id })),
+            { transaction }
+          );
+        }
+
+        await transaction.commit();
+        createdInvoiceIds.push(invoice.id);
+      } catch (error) {
+        await transaction.rollback();
+        failed.push({
+          householdId: household.id,
+          reason: error.name === 'SequelizeUniqueConstraintError'
+            ? 'INVOICE_ALREADY_EXISTS'
+            : error.message,
+        });
+      }
+    }
+
+    return sendSuccess(res, 201, 'Invoice generation completed', {
+      feePeriodId,
+      requestedHouseholds: households.length,
+      createdCount: createdInvoiceIds.length,
+      skippedCount: 0,
+      failedCount: failed.length,
+      createdInvoiceIds,
+      skipped: [],
+      failed,
+    });
   } catch (error) {
     return next(error);
   }
@@ -370,6 +507,7 @@ const createPayment = async (req, res, next) => {
 module.exports = {
   listInvoices,
   getInvoice,
+  generateInvoicesForFeePeriod,
   createInvoice,
   createPayment,
 };
