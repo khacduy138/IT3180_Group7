@@ -2308,3 +2308,392 @@ floating-point values must not be trusted for final financial totals.
 - [ ] Batch generation uses the documented per-household transaction strategy.
 - [ ] Financial calculations use decimal-safe arithmetic.
 - [ ] Contract tests cover success, validation, not found, conflict, authorization, dependency failure, and rollback cases.
+
+---
+
+# 15. Module 2 — Household & Resident API Contract
+
+**Module Owner:** Module 2 — Household & Resident Management
+**Base path:** `/api/households`
+**Purpose:** Quản lý hộ gia đình, nhân khẩu và phương tiện. Module 4 sử dụng `GET /api/households/:id/vehicles` để tính phí xe.
+
+---
+
+## 15.1. Authentication & Permissions
+
+Tất cả endpoints yêu cầu Bearer token. Permission mapping:
+
+| Resource | Permission |
+| --- | --- |
+| Đọc danh sách / chi tiết hộ | `households:read` |
+| Tạo / sửa / xóa hộ | `households:write` |
+| Đọc danh sách nhân khẩu | `residents:read` |
+| Thêm / sửa / xóa nhân khẩu | `residents:write` |
+
+Admin role bypass toàn bộ permission check (theo `authorize` middleware chung).
+
+---
+
+## 15.2. Database Schema
+
+### `households`
+
+| Column | Type | Constraints |
+| --- | --- | --- |
+| `id` | INTEGER | Primary key, auto-increment |
+| `uuid` | CHAR(36) | NOT NULL, UNIQUE |
+| `room_number` | VARCHAR | NOT NULL, UNIQUE (trong các hộ chưa xóa) |
+| `square_meters` | DECIMAL(8,2) | NOT NULL, > 0 |
+| `status` | VARCHAR | NOT NULL, ví dụ: `active`, `inactive` |
+| `deleted_at` | DATETIME | NULL — soft delete timestamp |
+| `created_at` | DATETIME | NOT NULL |
+| `updated_at` | DATETIME | NOT NULL |
+
+### `residents`
+
+| Column | Type | Constraints |
+| --- | --- | --- |
+| `id` | INTEGER | Primary key, auto-increment |
+| `uuid` | CHAR(36) | NOT NULL, UNIQUE |
+| `user_id` | INTEGER | Nullable FK → `users.id` |
+| `full_name` | VARCHAR | NOT NULL |
+| `phone_number` | VARCHAR | Nullable |
+| `citizen_id` | VARCHAR | Nullable, UNIQUE |
+| `date_of_birth` | DATE | Nullable |
+| `gender` | VARCHAR | NOT NULL |
+| `created_at` | DATETIME | NOT NULL |
+| `updated_at` | DATETIME | NOT NULL |
+
+### `household_members`
+
+Bảng nối giữa `households` và `residents`.
+
+| Column | Type | Constraints |
+| --- | --- | --- |
+| `id` | INTEGER | Primary key |
+| `household_id` | INTEGER | FK → `households.id`, NOT NULL |
+| `resident_id` | INTEGER | FK → `residents.id`, NOT NULL |
+| `relationship_to_head` | VARCHAR | Nullable |
+| `move_in_date` | DATE | NOT NULL |
+| `move_out_date` | DATE | Nullable — set khi rời hộ |
+| `is_temporary_absent` | BOOLEAN | NOT NULL, default false |
+
+UNIQUE INDEX: `(household_id, resident_id, move_in_date)`
+
+### `vehicles`
+
+| Column | Type | Constraints |
+| --- | --- | --- |
+| `id` | INTEGER | Primary key |
+| `household_id` | INTEGER | FK → `households.id`, NOT NULL |
+| `license_plate` | VARCHAR | NOT NULL, UNIQUE |
+| `vehicle_type` | VARCHAR | NOT NULL, ví dụ: `motorbike`, `car` |
+| `registered_at` | DATE | NOT NULL |
+| `removed_at` | DATE | Nullable — set khi đăng ký xóa |
+| `is_active` | BOOLEAN | NOT NULL, default true |
+
+---
+
+## 15.3. Business Rules
+
+- **Soft delete:** Household không bị xóa cứng; `deleted_at` được set khi "xóa". GET list không trả về hộ đã xóa.
+- **Unique room_number:** Chỉ unique trong các hộ chưa xóa mềm.
+- **Citizen ID unique toàn hệ thống:** Một CCCD chỉ được gắn với một Resident duy nhất.
+- **Resident remove = move_out:** Xóa nhân khẩu khỏi hộ không xóa bản ghi `residents`, chỉ set `move_out_date` trong `household_members`.
+- **Vehicle deactivate:** Xóa xe không xóa DB row, chỉ set `is_active = false` và `removed_at`.
+- **License plate:** Được chuẩn hóa về chữ HOA khi lưu.
+
+---
+
+## 15.4. Household Endpoints
+
+### GET /api/households
+
+Trả về danh sách hộ chưa xóa, có pagination và filter.
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `search` | string | No | Lọc theo `room_number` (LIKE) |
+| `status` | string | No | Lọc theo trạng thái, ví dụ: `active` |
+| `pageNumber` | number | No | Trang hiện tại, mặc định `1` |
+| `pageSize` | number | No | Số item / trang, mặc định `20`, tối đa `100` |
+
+**Success Response — 200 OK:**
+
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "message": "Households retrieved successfully",
+  "data": [
+    {
+      "id": 1,
+      "uuid": "aaaaaaaa-...",
+      "room_number": "A101",
+      "square_meters": "72.50",
+      "status": "active",
+      "deleted_at": null,
+      "created_at": "2026-05-01T00:00:00.000Z",
+      "updated_at": "2026-05-01T00:00:00.000Z"
+    }
+  ],
+  "pagination": {
+    "pageNumber": 1,
+    "pageSize": 20,
+    "totalRecords": 1,
+    "totalPages": 1,
+    "hasNextPage": false,
+    "hasPreviousPage": false
+  },
+  "timestamp": "2026-06-07T10:00:00.000Z"
+}
+```
+
+---
+
+### POST /api/households
+
+Tạo hộ mới.
+
+**Request Body:**
+
+```json
+{
+  "roomNumber": "A101",
+  "squareMeters": 72.5,
+  "status": "active"
+}
+```
+
+| Field | Type | Required | Rules |
+| --- | --- | --- | --- |
+| `roomNumber` | string | Yes | Non-empty, unique trong hộ chưa xóa |
+| `squareMeters` | number | Yes | Finite, > 0 |
+| `status` | string | No | Mặc định `active` |
+
+**Success Response — 201 Created:**
+
+```json
+{
+  "success": true,
+  "statusCode": 201,
+  "message": "Household created successfully",
+  "data": { "id": 1, "uuid": "...", "room_number": "A101", "square_meters": "72.50", "status": "active" },
+  "timestamp": "2026-06-07T10:00:00.000Z"
+}
+```
+
+**Error Responses:**
+
+| Status | Condition |
+| --- | --- |
+| `400` | `roomNumber` hoặc `squareMeters` không hợp lệ |
+| `409` | `roomNumber` đã tồn tại |
+
+---
+
+### GET /api/households/:id
+
+Trả về chi tiết hộ kèm danh sách nhân khẩu và phương tiện đang active.
+
+**Success Response — 200 OK:** Trả về household object với `household_members` (include `resident`) và `vehicles` (chỉ `is_active = true`).
+
+**Error:** `404` nếu không tìm thấy hoặc đã xóa mềm.
+
+---
+
+### PUT /api/households/:id
+
+Cập nhật thông tin hộ. Chỉ gửi các field muốn thay đổi.
+
+**Request Body:**
+
+```json
+{
+  "roomNumber": "A102",
+  "squareMeters": 80.0,
+  "status": "inactive"
+}
+```
+
+**Error Responses:**
+
+| Status | Condition |
+| --- | --- |
+| `404` | Household không tồn tại |
+| `409` | `roomNumber` mới đã được dùng bởi hộ khác |
+
+---
+
+### DELETE /api/households/:id
+
+Soft delete — set `deleted_at = now()`. Không xóa cứng khỏi DB.
+
+**Success Response — 200 OK:**
+
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "message": "Household deleted successfully",
+  "data": { "id": 1 },
+  "timestamp": "2026-06-07T10:00:00.000Z"
+}
+```
+
+---
+
+## 15.5. Resident Endpoints
+
+### GET /api/households/:id/residents
+
+Trả về danh sách `household_members` của hộ (include thông tin `resident`).
+
+**Query Parameters:** `pageNumber`, `pageSize`
+
+**Error:** `404` nếu hộ không tồn tại.
+
+---
+
+### POST /api/households/:id/residents
+
+Thêm nhân khẩu vào hộ. Nếu nhân khẩu chưa có trong DB → tạo mới `Resident` + `HouseholdMember` trong một transaction.
+
+**Request Body:**
+
+```json
+{
+  "fullName": "Nguyễn Văn A",
+  "gender": "male",
+  "citizenId": "001234567890",
+  "dateOfBirth": "1990-05-15",
+  "phoneNumber": "0901234567",
+  "relationshipToHead": "owner",
+  "moveInDate": "2026-06-01"
+}
+```
+
+| Field | Required | Rules |
+| --- | --- | --- |
+| `fullName` | Yes | Non-empty |
+| `gender` | Yes | Non-empty |
+| `moveInDate` | Yes | Ngày hợp lệ |
+| `citizenId` | No | UNIQUE toàn hệ thống nếu cung cấp |
+
+**Success Response — 201 Created:** `{ resident: {...}, membership: {...} }`
+
+**Error Responses:**
+
+| Status | Condition |
+| --- | --- |
+| `404` | Household không tồn tại |
+| `409` | `citizenId` đã tồn tại trong hệ thống |
+
+---
+
+### PUT /api/households/:id/residents/:residentId
+
+Cập nhật thông tin cá nhân của nhân khẩu (`fullName`, `gender`, `citizenId`, `dateOfBirth`, `phoneNumber`).
+
+**Error:** `404` nếu `residentId` không tồn tại. `409` nếu `citizenId` mới trùng với người khác.
+
+---
+
+### DELETE /api/households/:id/residents/:residentId
+
+Ghi `move_out_date` vào `household_members` — không xóa bản ghi `residents`.
+
+**Request Body (optional):**
+
+```json
+{ "moveOutDate": "2026-06-30" }
+```
+
+Nếu không truyền, mặc định là ngày hiện tại.
+
+---
+
+## 15.6. Vehicle Endpoints — Integration point for Module 4
+
+### GET /api/households/:id/vehicles ⭐
+
+**Endpoint quan trọng — Module 4 dùng để tính phí xe.**
+
+Trả về danh sách xe đang active (`is_active = true`) của hộ.
+
+**Success Response — 200 OK:**
+
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "message": "Vehicles retrieved successfully",
+  "data": [
+    {
+      "id": 5,
+      "household_id": 1,
+      "license_plate": "29A-12345",
+      "vehicle_type": "motorbike",
+      "registered_at": "2026-01-01",
+      "removed_at": null,
+      "is_active": true
+    }
+  ],
+  "timestamp": "2026-06-07T10:00:00.000Z"
+}
+```
+
+- `404` nếu hộ không tồn tại.
+- Empty array nếu hộ không có xe — Module 4 không tạo invoice item cho phí xe.
+
+---
+
+### POST /api/households/:id/vehicles
+
+Đăng ký xe mới cho hộ.
+
+**Request Body:**
+
+```json
+{
+  "licensePlate": "29a-12345",
+  "vehicleType": "motorbike",
+  "registeredAt": "2026-06-01"
+}
+```
+
+- `licensePlate` được chuẩn hóa thành chữ HOA trước khi lưu.
+- `409` nếu biển số đã tồn tại.
+
+---
+
+### DELETE /api/households/:id/vehicles/:vehicleId
+
+Hủy đăng ký xe — set `is_active = false`, `removed_at = today`. Không xóa DB row.
+
+---
+
+## 15.7. Module 2 Error Summary
+
+| Status | Condition |
+| --- | --- |
+| `400` | Thiếu field bắt buộc hoặc giá trị không hợp lệ |
+| `401` | Missing / invalid / expired token |
+| `403` | Không đủ permission |
+| `404` | Household / Resident / Vehicle không tồn tại |
+| `409` | `room_number` / `citizen_id` / `license_plate` trùng |
+| `500` | Lỗi server / DB |
+
+---
+
+## 15.8. Definition of Done — Issue #77 & #83 & #96
+
+- [x] DB migration `households`, `residents`, `household_members`, `vehicles` chạy thành công
+- [x] Migration `add-deleted-at-to-households` thêm cột soft delete
+- [x] Household model cập nhật có `deleted_at`
+- [x] `household.controller.js` implement đầy đủ: list, get, create, update, soft-delete, residents CRUD, vehicles CRUD
+- [x] `households.routes.js` wire toàn bộ controller với `authenticate` + `authorize`
+- [x] API contract Module 2 được document trong file này
+- [ ] Frontend `HouseholdListPage.jsx` — issue #96 follow-up
