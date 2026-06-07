@@ -14,6 +14,11 @@ const {
   Payment,
 } = require('../models');
 const { buildInvoiceItems } = require('../services/invoiceGeneration');
+const {
+  STATUSES,
+  canTransition,
+  getNewStatus,
+} = require('../utils/invoiceStateMachine');
 
 const DEFAULT_PAGE_SIZE = 20;
 
@@ -452,8 +457,8 @@ const createPayment = async (req, res, next) => {
     }
 
     const invoice = await Invoice.findByPk(invoiceId, {
-      include: [{ model: Payment, as: 'payments' }],
       transaction,
+      lock: transaction.LOCK.UPDATE,
     });
 
     if (!invoice) {
@@ -461,7 +466,7 @@ const createPayment = async (req, res, next) => {
       return sendError(res, 404, 'Invoice not found');
     }
 
-    if (invoice.status === 'PAID') {
+    if (invoice.status === STATUSES.PAID) {
       await transaction.rollback();
       return sendError(res, 409, 'Invoice is already fully paid');
     }
@@ -478,21 +483,21 @@ const createPayment = async (req, res, next) => {
       { transaction }
     );
 
-    const totalPaid = invoice.payments.reduce(
-      (sum, current) => sum + Number(current.amount),
-      0
+    const totalPaid = Number(
+      await Payment.sum('amount', {
+        where: { invoice_id: invoice.id },
+        transaction,
+      })
     );
+    const newStatus = getNewStatus(Number(invoice.total_amount), totalPaid);
 
-    const updatedPaid = totalPaid + Number(payment.amount);
-
-    invoice.paid_amount = updatedPaid;
-
-    if (updatedPaid >= Number(invoice.total_amount)) {
-      invoice.status = 'PAID';
-    } else if (updatedPaid > 0) {
-      invoice.status = 'PARTIAL';
+    if (!canTransition(invoice.status, newStatus)) {
+      await transaction.rollback();
+      return sendError(res, 409, 'Invalid invoice status transition');
     }
 
+    invoice.paid_amount = totalPaid;
+    invoice.status = newStatus;
     await invoice.save({ transaction });
 
     await transaction.commit();
