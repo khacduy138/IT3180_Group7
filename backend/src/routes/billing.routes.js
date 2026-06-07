@@ -1,12 +1,16 @@
 const express = require('express');
+
+const authenticate = require('../middleware/authenticate');
+const authorize = require('../middleware/authorize');
+const billingController = require('../controllers/billing.controller');
+
 const router = express.Router();
 
-router.get('/', (req, res) => {
-  res.json({ message: 'Get invoices - to be implemented', data: [] });
-});
+router.use(authenticate);
 
-router.post('/', (req, res) => {
-  res.json({ message: 'Create invoice - to be implemented' });
-});
+router.get('/', authorize({ permission: 'invoices:read' }), billingController.listInvoices);
+router.get('/:id', authorize({ permission: 'invoices:read' }), billingController.getInvoice);
+router.post('/', authorize({ permission: 'invoices:write' }), billingController.createInvoice);
+router.post('/:id/payments', authorize({ permission: 'payments:write' }), billingController.createPayment);
 
 module.exports = router;
