@@ -217,9 +217,7 @@ const generateInvoicesForFeePeriod = async (req, res, next) => {
         const invoice = await Invoice.create(
           {
             uuid: crypto.randomUUID(),
-            invoice_number: `${buildInvoiceNumber(feePeriod, household)}-${crypto
-              .randomUUID()
-              .slice(0, 8)}`,
+            invoice_number: buildInvoiceNumber(feePeriod, household),
             household_id: household.id,
             fee_period_id: feePeriod.id,
             total_amount: totalAmount,
