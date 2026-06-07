@@ -38,5 +38,6 @@ Thumbs.db
 
 # Project specific
 config/config.json
+*.zip
 
 OTHER/
