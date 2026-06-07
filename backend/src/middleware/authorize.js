@@ -11,10 +11,15 @@ function authorize(requirements = {}) {
   const requiredPermissions = toArray(
     requirements.permission || requirements.permissions,
   );
+  const allowAdmin = requirements.allowAdmin !== false;
 
   return (req, res, next) => {
     if (!req.user) {
       return res.status(401).json({ message: 'Authentication required' });
+    }
+
+    if (allowAdmin && req.user.role === 'admin') {
+      return next();
     }
 
     if (requiredRoles.length === 0 && requiredPermissions.length === 0) {

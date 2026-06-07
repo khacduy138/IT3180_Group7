@@ -1,6 +1,12 @@
 # Auth Middleware Guide
 
-Folder này chứa middleware dùng chung cho các route cần đăng nhập hoặc cần phân quyền.
+Folder này chứa middleware dùng chung để bảo vệ API.
+
+Trong backend hiện tại:
+
+- `authenticate` kiểm tra user đã đăng nhập chưa.
+- `authorize` kiểm tra user đã đăng nhập có đúng role hoặc permission không.
+- User Management routes được mount tại `/api/users` trong `src/app.js`.
 
 ## Request Flow
 
@@ -13,20 +19,23 @@ HTTP request
   -> JSON response
 ```
 
-## 1. `authenticate` Làm Gì?
+## 1. How To Use `authenticate`
 
-`authenticate` kiểm tra người gọi API đã đăng nhập chưa.
+`authenticate` đọc JWT token từ header:
+
+```text
+Authorization: Bearer <token>
+```
 
 Nó sẽ:
 
-- Đọc header `Authorization: Bearer <token>`.
 - Trả `401` nếu thiếu token.
-- Trả `401` nếu token không hợp lệ, hết hạn, hoặc đã logout.
+- Trả `401` nếu token sai, hết hạn, hoặc đã logout.
 - Verify token bằng `JWT_SECRET`.
 - Load user hiện tại từ database.
 - Gắn thông tin user vào `req.user`.
 
-Sau khi qua `authenticate`, controller hoặc middleware sau có thể dùng:
+Sau khi chạy xong, các middleware/controller phía sau có thể dùng:
 
 ```js
 req.user = {
@@ -34,98 +43,135 @@ req.user = {
   username: 'admin',
   role_id: 1,
   role: 'admin',
-  permissions: ['users:read', 'invoices:write']
+  permissions: ['users:create', 'users:read']
 };
 ```
 
-## 2. `authorize` Làm Gì?
+Ví dụ route chỉ cần đăng nhập:
 
-`authorize` kiểm tra người đã đăng nhập có đủ quyền để làm hành động đó không.
+```js
+const authenticate = require('../middleware/authenticate');
 
-Dùng `authorize` sau `authenticate`.
+router.get('/profile', authenticate, profileController.show);
+```
+
+## 2. How To Use `authorize` With Roles
+
+Role là vai trò lớn của user, ví dụ `admin`, `accountant`, `staff`.
+
+Dùng `authorize` sau `authenticate`:
 
 ```js
 const authenticate = require('../middleware/authenticate');
 const authorize = require('../middleware/authorize');
+
+router.get(
+  '/admin-report',
+  authenticate,
+  authorize({ roles: ['admin'] }),
+  reportController.adminReport
+);
 ```
 
-Nếu chỉ cần đăng nhập, dùng `authenticate`.
-
-Nếu cần đúng role hoặc permission, dùng thêm `authorize`.
-
-## 3. Protected Route
-
-Route này chỉ yêu cầu user đã login.
+Nếu chỉ cần một role, có thể viết:
 
 ```js
-router.get('/example', authenticate, controller);
+authorize({ role: 'admin' })
 ```
 
-## 4. Role-Protected Route
+Không dùng dạng này trong repo hiện tại:
 
-Route này yêu cầu user có role `admin`.
+```js
+authorize(['admin'])
+```
+
+## 3. How To Use `authorize` With Permissions
+
+Permission là quyền làm một hành động cụ thể, ví dụ:
+
+- `users:create`
+- `users:read`
+- `users:update`
+- `users:delete`
+- `billing:write`
+
+Ví dụ route cần permission:
 
 ```js
 router.post(
+  '/users',
+  authenticate,
+  authorize({ permissions: ['users:create'] }),
+  usersController.createUser
+);
+```
+
+Nếu chỉ cần một permission, có thể viết:
+
+```js
+authorize({ permission: 'users:create' })
+```
+
+Mặc định role `admin` được thiết kế để pass mọi permission check. Nếu sau này có route đặc biệt không muốn admin tự động pass, dùng:
+
+```js
+authorize({ permissions: ['some:permission'], allowAdmin: false })
+```
+
+## 4. Example Admin-Only Route
+
+Route này chỉ cho admin vào:
+
+```js
+router.get(
   '/example',
   authenticate,
   authorize({ roles: ['admin'] }),
-  controller
+  exampleController.index
 );
 ```
 
-Nếu chỉ có một role, có thể viết ngắn hơn:
+Trong repo hiện tại, `/api/users` là admin-only:
+
+```js
+router.use(authenticate);
+router.use(authorize({ roles: ['admin'] }));
+```
+
+## 5. Example Permission-Based Route
+
+Route này yêu cầu user có permission `billing:write`.
 
 ```js
 router.post(
-  '/example',
+  '/billing',
   authenticate,
-  authorize({ role: 'admin' }),
-  controller
+  authorize({ permissions: ['billing:write'] }),
+  billingController.create
 );
 ```
 
-Lưu ý: hiện tại middleware của repo dùng object config như trên. Đừng dùng `authorize(['admin'])` trong code hiện tại, vì dạng đó không phải signature đang được implement.
-
-## 5. Permission-Protected Route
-
-Route này yêu cầu user có permission `invoices:write`.
+Nếu muốn route vừa là admin-only vừa có permission rõ theo action, dùng nhiều middleware:
 
 ```js
 router.post(
-  '/example',
+  '/users',
   authenticate,
-  authorize({ permissions: ['invoices:write'] }),
-  controller
+  authorize({ roles: ['admin'] }),
+  authorize({ permissions: ['users:create'] }),
+  usersController.createUser
 );
 ```
 
-Nếu chỉ có một permission, có thể viết:
+## 6. Example Curl Flow
+
+Các ví dụ dưới đây dùng full URL `/api/users` vì trong `src/app.js` route users được mount như sau:
 
 ```js
-router.post(
-  '/example',
-  authenticate,
-  authorize({ permission: 'invoices:write' }),
-  controller
-);
+app.use('/api/users', require('./routes/users.routes'));
 ```
 
-## 6. Common HTTP Errors
-
-- `401 Unauthorized`: thiếu token, token sai, token hết hạn, token đã logout, hoặc user không còn active.
-- `403 Forbidden`: token hợp lệ và user đã login, nhưng user không có role/permission cần thiết.
-
-Nói ngắn gọn:
-
-```text
-401 = chưa chứng minh được "bạn là ai"
-403 = biết bạn là ai rồi, nhưng bạn không có quyền làm việc này
-```
-
-## 7. Example Curl Flow
-
-### Login
+### Login As Admin
 
 ```powershell
 curl.exe -X POST http://localhost:3001/api/auth/login `
@@ -133,57 +179,78 @@ curl.exe -X POST http://localhost:3001/api/auth/login `
   -d "{\"username\":\"admin\",\"password\":\"admin123456\"}"
 ```
 
-Response sẽ có `token`. Copy token đó để gọi route protected.
+Copy `token` trong response.
 
-### Call Protected Route With Bearer Token
+### Admin Calls `GET /users`
 
-Ví dụ route mẫu hiện tại là `GET /api/users`.
+Full URL là `GET /api/users`.
 
 ```powershell
-curl.exe http://localhost:3001/api/users `
-  -H "Authorization: Bearer <TOKEN>"
+curl.exe "http://localhost:3001/api/users?page=1&limit=10" `
+  -H "Authorization: Bearer <ADMIN_TOKEN>"
 ```
 
-### Logout
+Kết quả mong đợi: `200 OK`, trả về danh sách user.
+
+### Create A Non-Admin User If Needed
+
+Nếu database chưa có non-admin account, admin có thể tạo một staff user:
 
 ```powershell
-curl.exe -X POST http://localhost:3001/api/auth/logout `
-  -H "Authorization: Bearer <TOKEN>"
+curl.exe -X POST http://localhost:3001/api/users `
+  -H "Authorization: Bearer <ADMIN_TOKEN>" `
+  -H "Content-Type: application/json" `
+  -d "{\"username\":\"staff_demo\",\"password\":\"staff123456\",\"role_id\":3}"
 ```
 
-### Try Old Token Again
+`role_id = 3` thường là staff nếu đã chạy auth seeder.
 
-Sau khi logout, gọi lại token cũ:
+### Login As Non-Admin
 
 ```powershell
-curl.exe http://localhost:3001/api/users `
-  -H "Authorization: Bearer <TOKEN>"
+curl.exe -X POST http://localhost:3001/api/auth/login `
+  -H "Content-Type: application/json" `
+  -d "{\"username\":\"staff_demo\",\"password\":\"staff123456\"}"
+```
+
+Copy `token` của staff.
+
+### Non-Admin Calls `GET /users` And Receives 403
+
+```powershell
+curl.exe "http://localhost:3001/api/users?page=1&limit=10" `
+  -H "Authorization: Bearer <STAFF_TOKEN>"
 ```
 
 Kết quả mong đợi:
 
 ```json
 {
-  "message": "Token has been logged out"
+  "message": "Forbidden"
 }
 ```
 
-## 8. Teammate Import Pattern
+## 7. Common Errors
 
-Trong file route của module khác:
+- `401 Unauthorized`: thiếu token, token sai, token hết hạn, token đã logout, hoặc user không còn active.
+- `403 Forbidden`: token hợp lệ và user đã đăng nhập, nhưng không đủ role hoặc permission.
 
-```js
-const authenticate = require('../middleware/authenticate');
-const authorize = require('../middleware/authorize');
+Nói ngắn gọn:
+
+```text
+401 = chưa xác thực được "bạn là ai"
+403 = biết bạn là ai rồi, nhưng bạn không có quyền làm việc này
 ```
 
-Ví dụ:
+## 8. Where Permissions Come From
 
-```js
-router.get(
-  '/invoices',
-  authenticate,
-  authorize({ permission: 'invoices:read' }),
-  invoicesController.list
-);
+`authenticate` load permission theo quan hệ database hiện tại:
+
+```text
+users.role_id
+  -> roles.id
+  -> role_permissions.role_id
+  -> permissions.id
 ```
+
+Vì vậy teammate không cần tự query permissions trong controller. Sau `authenticate`, cứ dùng `req.user.permissions` hoặc dùng `authorize({ permissions: [...] })`.

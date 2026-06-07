@@ -26,6 +26,7 @@ Table roles {
   id integer [primary key, increment]
 
   name varchar [unique, not null, note: 'admin, accountant, staff, resident']
+  description varchar [null, note: 'Human-readable role description']
 }
 
 Table permissions {

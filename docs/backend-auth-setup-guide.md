@@ -1,125 +1,110 @@
-# Backend Auth Setup Guide
+# Backend Auth, RBAC, And User Management Setup Guide
 
 Tài liệu này dành cho thành viên mới lần đầu chạy backend BlueMoon AMS.
 
 Mục tiêu sau khi làm xong:
 
-- Máy có Node.js/npm.
-- Máy có MySQL server đang chạy.
+- Cài được Node.js/npm.
+- Cài và chạy được MySQL local.
 - Tạo được database local.
-- Chạy được migration và seeder.
-- Login lấy JWT token.
-- Gọi được route protected bằng Bearer token.
-- Biết các file auth nằm ở đâu và dùng như thế nào.
+- Chạy được migrations và seeders.
+- Login bằng admin mặc định để lấy JWT token.
+- Gọi được API protected bằng Bearer token.
+- Hiểu sơ bộ file nào làm gì trong Auth/RBAC/User Management.
 
-## 1. Cài Công Cụ Cần Thiết
+## 1. Công Cụ Cần Cài
 
-### 1.1. Node.js và npm
+### Node.js Và npm
 
-Cài Node.js bản LTS hoặc bản team đang dùng. Sau khi cài, mở PowerShell và kiểm tra:
+Cài Node.js bản LTS hoặc bản team đang dùng. Sau khi cài, mở PowerShell:
 
 ```powershell
 node --version
 npm.cmd --version
 ```
 
-Nếu có version hiện ra là được.
-
 Trên Windows, ưu tiên dùng `npm.cmd` thay vì `npm` nếu PowerShell báo lỗi execution policy.
 
-### 1.2. MySQL
+### MySQL
 
 Cài:
 
 - MySQL Community Server.
-- Nếu không thích dùng CLI, muốn có GUI thì cài thêm MySQL Workspace.
+- MySQL Workbench nếu muốn thao tác database bằng giao diện.
 
-Cần nhớ:
+Thông tin thường dùng:
 
-- Host thường là `localhost`.
-- Port thường là `3306`.
-- User thường là `root`.
-- Password là mật khẩu bạn đặt lúc cài MySQL.
+- Host: `localhost`
+- Port: `3306`
+- User: `root`
+- Password: mật khẩu bạn đặt khi cài MySQL
 
-### 1.3. Postman Hoặc curl
-
-Dùng để test API.
+### Postman Hoặc curl
 
 - Postman dễ nhìn hơn cho người mới.
-- `curl.exe` có sẵn trên Windows, tiện để copy command.
+- `curl.exe` có sẵn trên Windows và tiện để copy command.
 
-## 2. Sơ bộ cấu trúc Backend hiện tại
+## 2. Cấu Trúc Backend Cần Biết
 
 ```text
 backend/
 ├── config/
 │   └── config.js
-│
 ├── migrations/
 │   └── *.js
-│
 ├── seeders/
 │   └── *.js
-│
 ├── src/
 │   ├── app.js
 │   ├── server.js
 │   ├── config/
 │   │   └── database.js
-│   ├── models/
-│   ├── routes/
 │   ├── controllers/
-│   └── middleware/
-│
+│   ├── middleware/
+│   ├── models/
+│   └── routes/
 ├── .env.example
 └── package.json
 ```
 
-Các file quan trọng:
+Các file chính:
 
-- `backend/config/config.js`: config database cho Sequelize CLI, tức là khi chạy migrate/seed.
+- `backend/config/config.js`: config database cho Sequelize CLI khi chạy migrate/seed.
 - `backend/src/config/database.js`: config database cho code backend khi app đang chạy.
-- `backend/migrations`: tạo bảng trong MySQL.
-- `backend/seeders`: thêm dữ liệu mặc định, ví dụ role/admin/permission.
-- `backend/src/models`: JS model đại diện cho bảng DB.
+- `backend/migrations`: tạo hoặc thay đổi bảng thật trong MySQL.
+- `backend/seeders`: thêm dữ liệu mặc định như roles, permissions, admin account.
+- `backend/src/models`: Sequelize models đại diện cho bảng database.
 - `backend/src/routes`: khai báo URL API.
 - `backend/src/controllers`: xử lý logic API.
-- `backend/src/middleware`: middleware auth dùng chung.
+- `backend/src/middleware`: middleware auth/RBAC dùng chung.
 - `backend/src/app.js`: tạo Express app và gắn routes.
 - `backend/src/server.js`: start server bằng `app.listen`.
 
 ## 3. Setup Backend Lần Đầu
 
-### 3.1. Đi Vào Folder Backend
+Đi vào folder backend:
 
-Ví dụ:
 ```powershell
 cd D:\IT3180_Group7\backend
 ```
 
-### 3.2. Cài Package
+Cài package:
 
 ```powershell
 npm.cmd install
 ```
 
-Lệnh này đọc `backend/package.json` và tải dependencies trong package.
-
-Nếu đã có `backend/node_modules` sẵn thì k cần chạy, nma nên chạy lại để update package mới.
+Lệnh này đọc `backend/package.json` và tải dependencies như Express, Sequelize, MySQL driver, bcrypt, JWT.
 
 ## 4. Tạo File `.env`
 
-Trong `backend/`, tạo file `.env` bằng cách copy từ `.env.example`.
-
-PowerShell:
+Trong `backend/`, copy `.env.example` thành `.env`:
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-Sau đó mở `backend/.env` và sửa theo máy bạn.
-
-Ví dụ:
+Ví dụ nội dung `backend/.env`:
 
 ```env
 PORT=3001
@@ -128,7 +113,7 @@ NODE_ENV=development
 DB_HOST=localhost
 DB_PORT=3306
 DB_USER=root
-DB_PASSWORD=điền_mật_khẩu_mysql_ở_đây
+DB_PASSWORD=mat_khau_mysql_cua_ban
 DB_NAME=bluemoon_ams
 
 DEFAULT_ADMIN_PASSWORD=admin123456
@@ -136,30 +121,13 @@ JWT_SECRET=bluemoon_super_secret_key_2026_minimum_32_chars
 JWT_EXPIRE=7d
 ```
 
-Giải thích nhanh:
-
-- `PORT`: port backend chạy.
-- `DB_HOST`: địa chỉ MySQL.
-- `DB_PORT`: port MySQL, thường là `3306`.
-- `DB_USER`: user MySQL.
-- `DB_PASSWORD`: password MySQL.
-- `DB_NAME`: tên database local.
-- `DEFAULT_ADMIN_PASSWORD`: password ban đầu của user `admin` khi seed.
-- `JWT_SECRET`: khóa bí mật để ký JWT. Không để trống.
-- `JWT_EXPIRE`: thời hạn token, ví dụ `7d`.
-
-Btw không commit file `.env`.
+Không commit file `.env`.
 
 ## 5. Tạo Database Local
 
 Bạn cần tạo database trước khi chạy migration.
 
-### Cách 1: Dùng MySQL Workbench
-
-1. Mở MySQL Workbench.
-2. Kết nối vào local MySQL.
-3. Mở tab query.
-4. Chạy:
+Trong MySQL Workbench hoặc MySQL terminal:
 
 ```sql
 CREATE DATABASE bluemoon_ams
@@ -167,26 +135,9 @@ CREATE DATABASE bluemoon_ams
   COLLATE utf8mb4_unicode_ci;
 ```
 
-Nếu database đã tồn tại, không cần tạo lại.
+Nếu database đã tồn tại thì không cần tạo lại.
 
-### Cách 2: Dùng Terminal
-
-```powershell
-mysql -u root -p
-```
-
-Nhập password MySQL, rồi chạy:
-
-```sql
-CREATE DATABASE bluemoon_ams
-  CHARACTER SET utf8mb4
-  COLLATE utf8mb4_unicode_ci;
-EXIT;
-```
-
-Nếu máy không nhận lệnh `mysql`, dùng MySQL Workbench cho dễ.
-
-## 7. Chạy Migration
+## 6. Chạy Migrations
 
 Trong `backend/`:
 
@@ -194,24 +145,23 @@ Trong `backend/`:
 npm.cmd run db:migrate
 ```
 
-Migration dùng để tạo bảng thật trong MySQL.
+Migrations hiện tại tạo các nhóm bảng:
 
-Kết quả mong đợi:
+- Auth/RBAC: `users`, `roles`, `permissions`, `role_permissions`.
+- Household/Resident.
+- Fee configuration.
+- Billing/Payment.
+- Cột `roles.description`.
 
-```text
-== 20260526000100-create-auth-core: migrated
-...
-```
-
-Hoặc:
+Nếu thấy dòng kiểu này là bình thường:
 
 ```text
 No migrations were executed, database schema was already up to date.
 ```
 
-Dòng thứ hai nghĩa là bảng đã được tạo rồi, không phải lỗi.
+Nó nghĩa là DB đã migrate rồi.
 
-## 8. Chạy Seeder
+## 7. Chạy Seeders
 
 Trong `backend/`:
 
@@ -219,12 +169,31 @@ Trong `backend/`:
 npm.cmd run db:seed
 ```
 
-Seeder dùng để thêm dữ liệu mặc định:
+Seeder Auth/RBAC hiện tạo hoặc cập nhật:
 
-- Roles: `admin`, `accountant`, `staff`, `resident`
-- Permissions
-- Role-permission mappings
-- User admin mặc định
+- Roles:
+  - `admin`: full system administrator.
+  - `accountant`: xử lý fees, billing, invoices, payments.
+  - `staff`: xử lý household/resident information.
+- Permissions theo convention `resource:action`:
+  - `users:create`
+  - `users:read`
+  - `users:update`
+  - `users:delete`
+  - `households:read`
+  - `households:write`
+  - `residents:read`
+  - `residents:write`
+  - `fees:read`
+  - `fees:write`
+  - `billing:read`
+  - `billing:write`
+  - `reports:read`
+- Role-permission mapping:
+  - `admin`: tất cả permissions.
+  - `accountant`: `billing:read`, `billing:write`, `fees:read`.
+  - `staff`: `households:read`, `households:write`, `residents:read`, `residents:write`.
+- User `admin` mặc định nếu chưa tồn tại.
 
 Login mặc định sau seed:
 
@@ -233,11 +202,11 @@ username: admin
 password: admin123456
 ```
 
-Nếu bạn đổi `DEFAULT_ADMIN_PASSWORD` trong `.env` trước lần seed đầu, password admin sẽ theo biến đó.
+Nếu đã set `DEFAULT_ADMIN_PASSWORD` trong `.env` trước lần seed đầu, password admin sẽ dùng biến đó.
 
-Lưu ý: seeder hiện không reset password admin nếu admin đã tồn tại. Nếu muốn đổi password, dùng API change-password hoặc cập nhật DB local thủ công.
+Lưu ý: seeder không reset password admin nếu user `admin` đã tồn tại. Muốn đổi password thì dùng API `change-password`.
 
-## 9. Chạy Backend
+## 8. Chạy Backend
 
 Trong `backend/`:
 
@@ -271,11 +240,9 @@ Khi dev, có thể dùng:
 npm.cmd run dev
 ```
 
-Lệnh này dùng `nodemon`, tự restart server khi code đổi.
+## 9. Auth API
 
-## 10. Test Auth API Bằng curl
-
-### 10.1. Login
+### Login
 
 ```powershell
 curl.exe -X POST http://localhost:3001/api/auth/login `
@@ -283,7 +250,7 @@ curl.exe -X POST http://localhost:3001/api/auth/login `
   -d "{\"username\":\"admin\",\"password\":\"admin123456\"}"
 ```
 
-Response sẽ có dạng:
+Response sẽ có `token`:
 
 ```json
 {
@@ -296,47 +263,21 @@ Response sẽ có dạng:
       "id": 1,
       "name": "admin"
     },
-    "permissions": ["users:read"]
+    "permissions": ["users:create", "users:read"]
   }
 }
 ```
 
-Copy giá trị `token`.
+Copy `token` để gọi API protected.
 
-### 10.2. Gọi Protected Route Bằng Bearer Token
-
-Route mẫu hiện tại:
-
-```text
-GET /api/users
-```
-
-Lệnh:
-
-```powershell
-curl.exe http://localhost:3001/api/users `
-  -H "Authorization: Bearer <TOKEN>"
-```
-
-Thay `<TOKEN>` bằng token lấy từ login.
-
-Nếu token đúng và user có permission `users:read`, kết quả:
-
-```json
-{
-  "message": "Get users - to be implemented",
-  "data": []
-}
-```
-
-### 10.3. Logout
+### Logout
 
 ```powershell
 curl.exe -X POST http://localhost:3001/api/auth/logout `
   -H "Authorization: Bearer <TOKEN>"
 ```
 
-Kết quả:
+Sau logout, token cũ bị blacklist trong RAM:
 
 ```json
 {
@@ -344,24 +285,9 @@ Kết quả:
 }
 ```
 
-### 10.4. Thử Lại Token Cũ
+Giới hạn hiện tại: blacklist token đang dùng `Set` trong RAM. Nếu restart server, blacklist sẽ mất.
 
-```powershell
-curl.exe http://localhost:3001/api/users `
-  -H "Authorization: Bearer <TOKEN>"
-```
-
-Kết quả mong đợi:
-
-```json
-{
-  "message": "Token has been logged out"
-}
-```
-
-Lưu ý: blacklist token hiện nằm trong RAM bằng `Set`. Nếu restart server, blacklist mất. Đây là giới hạn chấp nhận được cho Sprint 1/local dev.
-
-### 10.5. Đổi Mật Khẩu
+### Change Password
 
 ```powershell
 curl.exe -X POST http://localhost:3001/api/auth/change-password `
@@ -378,111 +304,204 @@ Kết quả:
 }
 ```
 
-Sau đó login bằng password mới.
+Password lưu trong DB là `password_hash`, không lưu plain password.
 
-## 11. Test Auth API Bằng Postman
+## 10. User Management API
 
-### Login
+Tất cả `/api/users` routes hiện là admin-only.
 
-- Method: `POST`
-- URL: `http://localhost:3001/api/auth/login`
-- Body -> raw -> JSON:
-
-```json
-{
-  "username": "admin",
-  "password": "admin123456"
-}
-```
-
-### Gọi Protected Route
-
-- Method: `GET`
-- URL: `http://localhost:3001/api/users`
-- Tab Authorization:
-  - Type: `Bearer Token`
-  - Token: paste token từ login
-
-Hoặc thêm header thủ công:
+Flow:
 
 ```text
-Authorization: Bearer <TOKEN>
+request
+  -> authenticate
+  -> authorize({ roles: ['admin'] })
+  -> authorize permission theo action
+  -> usersController
 ```
 
-### Logout
+### GET `/api/users`
 
-- Method: `POST`
-- URL: `http://localhost:3001/api/auth/logout`
-- Authorization: Bearer Token
+List users với role, pagination, optional search.
 
-### Change Password
+```powershell
+curl.exe "http://localhost:3001/api/users?page=1&limit=10&search=admin" `
+  -H "Authorization: Bearer <ADMIN_TOKEN>"
+```
 
-- Method: `POST`
-- URL: `http://localhost:3001/api/auth/change-password`
-- Authorization: Bearer Token
-- Body -> raw -> JSON:
+Response mẫu:
 
 ```json
 {
-  "old_password": "admin123456",
-  "new_password": "newpass123456"
+  "data": [
+    {
+      "id": 1,
+      "username": "admin",
+      "role_id": 1,
+      "role": {
+        "id": 1,
+        "name": "admin",
+        "description": "Full system administrator with all permissions."
+      },
+      "is_active": true
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 10,
+    "total": 1,
+    "total_pages": 1
+  }
 }
 ```
 
-## 12. Cách Dùng Middleware Trong Module Khác
+Pagination:
 
-Trong route file:
+- `page`: trang hiện tại, bắt đầu từ `1`.
+- `limit`: số user mỗi trang, tối đa `100`.
+- `search`: tìm gần đúng theo `username`.
+
+### POST `/api/users`
+
+Tạo user mới. Backend hash password bằng bcrypt trước khi lưu.
+
+```powershell
+curl.exe -X POST http://localhost:3001/api/users `
+  -H "Authorization: Bearer <ADMIN_TOKEN>" `
+  -H "Content-Type: application/json" `
+  -d "{\"username\":\"staff_demo\",\"password\":\"staff123456\",\"role_id\":3}"
+```
+
+`role_id = 3` thường là staff sau khi chạy seeder. Nếu không chắc role id, kiểm tra bằng SQL:
+
+```sql
+SELECT id, name, description FROM roles;
+```
+
+### PUT `/api/users/:id`
+
+Update `username`, `role_id`, `is_active`, hoặc `password`.
+
+Password chỉ được hash lại nếu request có field `password`.
+
+```powershell
+curl.exe -X PUT http://localhost:3001/api/users/2 `
+  -H "Authorization: Bearer <ADMIN_TOKEN>" `
+  -H "Content-Type: application/json" `
+  -d "{\"username\":\"staff_demo_updated\",\"is_active\":true}"
+```
+
+Đổi role:
+
+```powershell
+curl.exe -X PUT http://localhost:3001/api/users/2 `
+  -H "Authorization: Bearer <ADMIN_TOKEN>" `
+  -H "Content-Type: application/json" `
+  -d "{\"role_id\":2}"
+```
+
+### DELETE `/api/users/:id`
+
+Soft delete user bằng cách set `is_active = false`.
+
+```powershell
+curl.exe -X DELETE http://localhost:3001/api/users/2 `
+  -H "Authorization: Bearer <ADMIN_TOKEN>"
+```
+
+Không xóa hard delete vì user có thể liên quan lịch sử hóa đơn, payment, entered_by, created_by.
+
+Admin không được xóa chính mình:
+
+```json
+{
+  "message": "Admin cannot deactivate their own account"
+}
+```
+
+## 11. Test Non-Admin Bị Chặn
+
+Tạo staff user bằng admin, sau đó login staff:
+
+```powershell
+curl.exe -X POST http://localhost:3001/api/auth/login `
+  -H "Content-Type: application/json" `
+  -d "{\"username\":\"staff_demo\",\"password\":\"staff123456\"}"
+```
+
+Gọi user management bằng staff token:
+
+```powershell
+curl.exe "http://localhost:3001/api/users?page=1&limit=10" `
+  -H "Authorization: Bearer <STAFF_TOKEN>"
+```
+
+Kết quả mong đợi:
+
+```json
+{
+  "message": "Forbidden"
+}
+```
+
+## 12. Dùng Middleware Trong Module Khác
+
+Import:
 
 ```js
 const authenticate = require('../middleware/authenticate');
 const authorize = require('../middleware/authorize');
 ```
 
-### Chỉ Cần Login
+Route chỉ cần login:
 
 ```js
 router.get('/example', authenticate, controller);
 ```
 
-### Cần Role
+Route cần role:
 
 ```js
 router.post(
   '/example',
   authenticate,
-  authorize({ role: 'admin' }),
+  authorize({ roles: ['admin'] }),
   controller
 );
 ```
 
-Hoặc nhiều role:
-
-```js
-authorize({ roles: ['admin', 'accountant'] })
-```
-
-### Cần Permission
+Route cần permission:
 
 ```js
 router.post(
   '/example',
   authenticate,
-  authorize({ permission: 'invoices:write' }),
+  authorize({ permissions: ['billing:write'] }),
   controller
 );
 ```
 
-Hoặc nhiều permission:
+Route admin-only và có permission theo action:
 
 ```js
-authorize({ permissions: ['invoices:write', 'payments:write'] })
+router.post(
+  '/users',
+  authenticate,
+  authorize({ roles: ['admin'] }),
+  authorize({ permissions: ['users:create'] }),
+  usersController.createUser
+);
+```
+
+Chi tiết hơn nằm ở:
+
+```text
+backend/src/middleware/README.md
 ```
 
 ## 13. `req.user` Là Gì?
 
-Sau khi request đi qua `authenticate`, backend gắn user hiện tại vào `req.user`.
-
-Ví dụ:
+Sau khi request đi qua `authenticate`, backend gắn user hiện tại vào `req.user`:
 
 ```js
 req.user = {
@@ -490,8 +509,17 @@ req.user = {
   username: 'admin',
   role_id: 1,
   role: 'admin',
-  permissions: ['users:read', 'users:write']
+  permissions: ['users:create', 'users:read']
 };
+```
+
+Permissions được load theo quan hệ DB:
+
+```text
+users.role_id
+  -> roles.id
+  -> role_permissions.role_id
+  -> permissions.id
 ```
 
 Controller có thể dùng:
@@ -500,21 +528,9 @@ Controller có thể dùng:
 const createdBy = req.user.id;
 ```
 
-Ví dụ tạo invoice:
+## 14. 401 Và 403 Khác Gì Nhau?
 
-```js
-await Invoice.create({
-  household_id,
-  total_amount,
-  created_by: req.user.id
-});
-```
-
-## 14. Mã Lỗi Hay Gặp
-
-### `401 Unauthorized`
-
-Nghĩa là hệ thống chưa xác thực được bạn.
+`401 Unauthorized`: hệ thống chưa xác thực được user.
 
 Thường do:
 
@@ -524,16 +540,66 @@ Thường do:
 - Token đã logout.
 - User không còn tồn tại hoặc inactive.
 
-### `403 Forbidden`
-
-Nghĩa là bạn đã login rồi, nhưng không có quyền làm hành động đó.
+`403 Forbidden`: user đã login rồi, nhưng không đủ quyền.
 
 Ví dụ:
 
-- Route cần `users:read`.
-- User hiện tại không có permission `users:read`.
+- Route cần role `admin`.
+- User hiện tại là `staff`.
 
-## 15. Lỗi Setup Hay Gặp
+## 15. Kiểm Tra DB Bằng SQL
+
+Roles và descriptions:
+
+```sql
+SELECT id, name, description FROM roles;
+```
+
+Permissions:
+
+```sql
+SELECT id, name FROM permissions ORDER BY name;
+```
+
+Role permissions:
+
+```sql
+SELECT r.name AS role_name, p.name AS permission_name
+FROM roles r
+JOIN role_permissions rp ON rp.role_id = r.id
+JOIN permissions p ON p.id = rp.permission_id
+ORDER BY r.name, p.name;
+```
+
+Users với role:
+
+```sql
+SELECT u.id, u.username, u.is_active, r.name AS role_name
+FROM users u
+JOIN roles r ON r.id = u.role_id;
+```
+
+Admin permissions:
+
+```sql
+SELECT r.name AS role_name, p.name AS permission_name
+FROM users u
+JOIN roles r ON r.id = u.role_id
+JOIN role_permissions rp ON rp.role_id = r.id
+JOIN permissions p ON p.id = rp.permission_id
+WHERE u.username = 'admin'
+ORDER BY p.name;
+```
+
+Soft delete check:
+
+```sql
+SELECT id, username, is_active
+FROM users
+WHERE id = 2;
+```
+
+## 16. Lỗi Setup Hay Gặp
 
 ### PowerShell Không Chạy Được `npm`
 
@@ -553,13 +619,9 @@ DB_USER=root
 DB_PASSWORD=mat_khau_mysql_cua_ban
 ```
 
-Password phải đúng với MySQL local.
-
 ### Unknown Database `bluemoon_ams`
 
 Bạn chưa tạo database.
-
-Tạo bằng MySQL Workbench:
 
 ```sql
 CREATE DATABASE bluemoon_ams
@@ -578,46 +640,11 @@ JWT_EXPIRE=7d
 
 ### Token Vừa Logout Nhưng Sau Restart Lại Dùng Được
 
-Đây là giới hạn hiện tại.
-
-Logout blacklist đang lưu trong RAM bằng `Set`, nên restart server sẽ mất blacklist. Sau này production có thể chuyển sang bảng DB hoặc Redis.
-
-## 16. Kiểm Tra DB Bằng SQL
-
-Sau khi seed, có thể kiểm tra:
-
-```sql
-SELECT id, name FROM roles;
-SELECT id, name FROM permissions;
-SELECT id, username, role_id, is_active FROM users;
-SELECT role_id, permission_id FROM role_permissions;
-```
-
-Kiểm tra admin có role:
-
-```sql
-SELECT u.id, u.username, r.name AS role_name
-FROM users u
-JOIN roles r ON r.id = u.role_id
-WHERE u.username = 'admin';
-```
-
-Kiểm tra admin có permissions:
-
-```sql
-SELECT r.name AS role_name, p.name AS permission_name
-FROM users u
-JOIN roles r ON r.id = u.role_id
-JOIN role_permissions rp ON rp.role_id = r.id
-JOIN permissions p ON p.id = rp.permission_id
-WHERE u.username = 'admin';
-```
+Đây là giới hạn hiện tại. Logout blacklist đang lưu trong RAM bằng `Set`, nên restart server sẽ mất blacklist.
 
 ## 17. Reset Local DB Nếu Muốn Làm Lại Từ Đầu
 
 Cảnh báo: bước này xóa database local.
-
-Chỉ làm nếu bạn đang dùng DB local của riêng bạn và chấp nhận mất dữ liệu.
 
 Trong MySQL:
 

@@ -1,34 +1,36 @@
 const express = require('express');
 
+const usersController = require('../controllers/users.controller');
 const authenticate = require('../middleware/authenticate');
 const authorize = require('../middleware/authorize');
 
 const router = express.Router();
 
 router.use(authenticate);
+router.use(authorize({ roles: ['admin'] }));
 
 router.get(
   '/',
-  authorize({ permission: 'users:read' }),
-  (req, res) => res.json({ success: true, data: [], message: 'Get users - to be implemented' })
+  authorize({ permissions: ['users:read'] }),
+  usersController.listUsers,
 );
 
 router.post(
   '/',
-  authorize({ permission: 'users:write' }),
-  (req, res) => res.status(501).json({ success: false, message: 'Create user - to be implemented' })
+  authorize({ permissions: ['users:create'] }),
+  usersController.createUser,
 );
 
 router.put(
   '/:id',
-  authorize({ permission: 'users:write' }),
-  (req, res) => res.status(501).json({ success: false, message: 'Update user - to be implemented' })
+  authorize({ permissions: ['users:update'] }),
+  usersController.updateUser,
 );
 
 router.delete(
   '/:id',
-  authorize({ permission: 'users:write' }),
-  (req, res) => res.status(501).json({ success: false, message: 'Deactivate user - to be implemented' })
+  authorize({ permissions: ['users:delete'] }),
+  usersController.deactivateUser,
 );
 
 module.exports = router;

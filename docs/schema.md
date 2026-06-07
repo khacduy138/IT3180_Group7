@@ -4,7 +4,7 @@ This document summarizes the current relational schema implemented by the Sequel
 
 ## Module 1: Auth & System Core
 
-- `roles`: RBAC role names such as `admin`, `accountant`, `staff`, and `resident`.
+- `roles`: RBAC role names such as `admin`, `accountant`, and `staff`, plus a human-readable `description`.
 - `permissions`: permission keys such as `residents:read` and `invoices:write`.
 - `role_permissions`: many-to-many join table between roles and permissions.
 - `users`: login accounts. Each user belongs to one role.
@@ -52,3 +52,4 @@ Monthly periods can copy `period_fees` from the previous month and then add/remo
 - `20260526000200-create-household-resident.js`
 - `20260526000300-create-fee-configuration.js`
 - `20260526000400-create-billing-payment.js`
+- `20260605000100-add-description-to-roles.js`
