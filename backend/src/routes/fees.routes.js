@@ -7,17 +7,12 @@ const router = express.Router();
 /*
  * Module 3 — Fee Management Routes
  *
- * Planned mounting:
- *   app.use('/api', feesRoutes);
+ * Mounted at: app.use('/api', feesRoutes)
  *
  * Resulting endpoints:
  *   /api/fee-types
  *   /api/fee-periods
  *   /api/utility-invoices
- *
- * Authentication integration:
- *   Uncomment router.use(authenticate) after Tuấn completes
- *   src/middleware/authenticate.js.
  */
 
 const authenticate = require('../middleware/authenticate');
