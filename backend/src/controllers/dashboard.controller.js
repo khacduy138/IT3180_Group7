@@ -194,36 +194,52 @@ const getReportByPeriod = async (req, res) => {
 };
 
 const globalSearch = async (req, res) => {
-  const { q } = req.query;
-  if (!q) return res.json({ households: [], residents: [] });
+  const { q, category, startDate, endDate } = req.query;
+  if (!q && !startDate) return res.json({ success: true, data: { households: [], residents: [], invoices: [] } });
 
   try {
-    const households = await Household.findAll({
-      where: {
-        [Op.or]: [
-          { room_number: { [Op.like]: `%${q}%` } },
-          { uuid: { [Op.like]: `%${q}%` } }
-        ]
-      },
-      limit: 10
-    });
+    const results = { households: [], residents: [], invoices: [] };
+    const limit = 10;
 
-    const residents = await Resident.findAll({
-      where: {
-        [Op.or]: [
-          { full_name: { [Op.like]: `%${q}%` } },
-          { citizen_id: { [Op.like]: `%${q}%` } }
-        ]
-      },
-      limit: 10
-    });
+    if (!category || category === 'all' || category === 'people') {
+      results.households = await Household.findAll({
+        where: { room_number: { [Op.like]: `%${q}%` }, deleted_at: null },
+        limit
+      });
 
-    return res.json({
-      success: true,
-      data: { households, residents }
-    });
+      results.residents = await Resident.findAll({
+        where: {
+          [Op.or]: [
+            { full_name: { [Op.like]: `%${q}%` } },
+            { citizen_id: { [Op.like]: `%${q}%` } },
+            { phone_number: { [Op.like]: `%${q}%` } }
+          ]
+        },
+        include: [{ model: Household, as: 'households', attributes: ['room_number'], through: { attributes: [] } }],
+        limit
+      });
+    }
+
+    if (!category || category === 'all' || category === 'finance') {
+      const whereInvoice = {};
+      if (q) {
+        whereInvoice.invoice_number = { [Op.like]: `%${q}%` };
+      }
+      if (startDate && endDate) {
+        whereInvoice.created_at = { [Op.between]: [new Date(startDate + " 00:00:00"), new Date(endDate + " 23:59:59")] };
+      }
+
+      results.invoices = await Invoice.findAll({
+        where: whereInvoice,
+        include: [{ model: Household, as: 'household', attributes: ['room_number'] }],
+        limit
+      });
+    }
+
+    return res.json({ success: true, data: results });
   } catch (error) {
-    return res.status(500).json({ message: 'Lỗi khi tìm kiếm' });
+    console.error("SEARCH_ERROR:", error);
+    return res.status(500).json({ success: false, message: 'Lỗi tìm kiếm', error: error.message });
   }
 };
 

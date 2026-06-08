@@ -34,6 +34,7 @@ import {
   CardFooter,
 } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
+import SmartSearch from "../../components/ui/SmartSearch";
 import { Spinner } from "../../components/ui/Spinner";
 import {
   Table,
@@ -45,6 +46,7 @@ import {
 } from "../../components/ui/Table";
 import { Tag } from "../../components/ui/Tag";
 import { Toast } from "../../components/ui/Toast";
+
 
 const STATUS_MAP = {
   PAID: { label: "Đã nộp", color: "green" },
@@ -139,7 +141,7 @@ export default function DashboardPage() {
 
         if (demo.success) setDemoData(demo.data);
       } catch (error) {
-        console.error("Dashboard Fetch Error:", error); // Helpful for debugging
+        console.error("Dashboard Fetch Error:", error);
         setToast({
           open: true,
           variant: "error",
@@ -184,7 +186,6 @@ export default function DashboardPage() {
             <div className="flex h-[60vh] w-full items-center justify-center">
               <div className="flex flex-col items-center gap-2">
                 <Spinner className="h-8 w-8 text-primary" />{" "}
-                {/* Hoặc dùng component Spinner của Trung */}
                 <p className="text-muted-foreground animate-pulse">
                   Đang tải dữ liệu...
                 </p>
@@ -205,6 +206,18 @@ export default function DashboardPage() {
                   <Download size={18} /> Export report
                 </Button>
               </div>
+              <SmartSearch 
+                    endpoint="http://localhost:3001/api/dashboard/search"
+                    categories={[
+                    { value: 'all', label: 'Tất cả' },
+                    { value: 'people', label: 'Nhân khẩu' },
+                    { value: 'finance', label: 'Tài chính' }
+                    ]}
+                    placeholder="Tra cứu cư dân, hóa đơn hoặc số phòng..."
+                    onResultSelect={(type, item) => {
+                    console.log(`Bạn đã chọn ${type}:`, item);
+                    }}
+              />
 
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
                 <Card>

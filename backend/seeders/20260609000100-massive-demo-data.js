@@ -150,13 +150,20 @@ module.exports = {
       const [dbInvoices] = await queryInterface.sequelize.query(`SELECT id, household_id FROM invoices`, { transaction });
 
       const invoiceItems = [];
-      const qlFeeId = dbFeeTypes[0].id;
       dbInvoices.forEach(inv => {
         const hh = dbHouseholds.find(h => h.id === inv.household_id);
-        const amt = parseFloat(hh.square_meters) * 15000;
-        invoiceItems.push({
-          invoice_id: inv.id, fee_type_id: qlFeeId, quantity: hh.square_meters,
-          price_snapshot: 15000, line_total: amt, source: 'AUTO', created_at: new Date()
+        dbFeeTypes.forEach(ft => {
+          let qty = 1;
+          if (ft.code === 'QL') qty = hh.square_meters;
+          if (ft.code === 'DIEN') qty = Math.floor(Math.random() * 200 + 50);
+          if (ft.code === 'NUOC') qty = Math.floor(Math.random() * 20 + 5);
+
+          invoiceItems.push({
+            invoice_id: inv.id, fee_type_id: ft.id,
+            quantity: qty, price_snapshot: ft.unit_price,
+            line_total: qty * parseFloat(ft.unit_price),
+            source: 'AUTO', created_at: new Date()
+          });
         });
       });
       await queryInterface.bulkInsert('invoice_items', invoiceItems, { transaction });
