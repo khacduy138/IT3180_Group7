@@ -6,8 +6,11 @@ const {
   FeePeriod,
   PeriodFee,
   UtilityInvoice,
+  InvoiceItem,
   Household,
 } = require('../models');
+
+const VALID_CALCULATION_TYPES = ['per_area', 'per_vehicle', 'per_person', 'fixed', 'utility'];
 
 const DEFAULT_PAGE_SIZE = 20;
 
@@ -107,16 +110,22 @@ const createFeeType = async (req, res, next) => {
 
     if (!calculationType) {
       errors.push({ field: 'calculationType', code: 'VAL_001', message: 'calculationType is required' });
+    } else if (!VALID_CALCULATION_TYPES.includes(calculationType)) {
+      errors.push({
+        field: 'calculationType',
+        code: 'VAL_002',
+        message: `calculationType must be one of: ${VALID_CALCULATION_TYPES.join(', ')}`,
+      });
     }
 
     if (!invoiceGenerationMode) {
       errors.push({ field: 'invoiceGenerationMode', code: 'VAL_001', message: 'invoiceGenerationMode is required' });
     }
 
-    const unitPriceNumber = Number(unitPrice || 0);
+    const unitPriceNumber = Number(unitPrice);
 
-    if (!Number.isFinite(unitPriceNumber) || unitPriceNumber < 0) {
-      errors.push({ field: 'unitPrice', code: 'VAL_002', message: 'unitPrice must be a finite number >= 0' });
+    if (!Number.isFinite(unitPriceNumber) || unitPriceNumber <= 0) {
+      errors.push({ field: 'unitPrice', code: 'VAL_002', message: 'unitPrice must be a finite number > 0' });
     }
 
     if (errors.length) {
@@ -164,10 +173,13 @@ const getFeeType = async (req, res, next) => {
 };
 
 const updateFeeType = async (req, res, next) => {
+  const transaction = await sequelize.transaction();
+
   try {
-    const feeType = await FeeType.findByPk(req.params.id);
+    const feeType = await FeeType.findByPk(req.params.id, { transaction });
 
     if (!feeType) {
+      await transaction.rollback();
       return sendError(res, 404, 'Fee type not found');
     }
 
@@ -188,10 +200,36 @@ const updateFeeType = async (req, res, next) => {
     if (unitPrice !== undefined) {
       const unitPriceNumber = Number(unitPrice);
 
-      if (!Number.isFinite(unitPriceNumber) || unitPriceNumber < 0) {
+      if (!Number.isFinite(unitPriceNumber) || unitPriceNumber <= 0) {
+        await transaction.rollback();
         return sendError(res, 400, 'Invalid unitPrice', [
-          { field: 'unitPrice', code: 'VAL_002', message: 'unitPrice must be a finite number >= 0' },
+          { field: 'unitPrice', code: 'VAL_002', message: 'unitPrice must be a finite number > 0' },
         ]);
+      }
+
+      const oldPrice = Number(feeType.unit_price);
+
+      if (unitPriceNumber !== oldPrice) {
+        const today = new Date().toISOString().slice(0, 10);
+
+        await FeeTypePriceHistory.update(
+          { effective_to: today },
+          {
+            where: { fee_type_id: feeType.id, effective_to: null },
+            transaction,
+          }
+        );
+
+        await FeeTypePriceHistory.create(
+          {
+            fee_type_id: feeType.id,
+            unit_price: unitPriceNumber,
+            effective_from: today,
+            effective_to: null,
+            created_by: req.user?.id || null,
+          },
+          { transaction }
+        );
       }
 
       feeType.unit_price = unitPriceNumber;
@@ -201,10 +239,12 @@ const updateFeeType = async (req, res, next) => {
     if (invoiceGenerationMode !== undefined) feeType.invoice_generation_mode = invoiceGenerationMode;
     if (vehicleType !== undefined) feeType.vehicle_type = vehicleType;
 
-    await feeType.save();
+    await feeType.save({ transaction });
+    await transaction.commit();
 
     return sendSuccess(res, 200, 'Fee type updated successfully', feeType);
   } catch (error) {
+    await transaction.rollback();
     return next(error);
   }
 };
@@ -215,6 +255,19 @@ const deactivateFeeType = async (req, res, next) => {
 
     if (!feeType) {
       return sendError(res, 404, 'Fee type not found');
+    }
+
+    const invoiceItemCount = await InvoiceItem.count({
+      where: { fee_type_id: feeType.id },
+    });
+
+    if (invoiceItemCount > 0) {
+      return sendError(
+        res,
+        409,
+        'Cannot delete fee type that has associated invoices',
+        [{ field: 'id', code: 'CONFLICT_001', message: `Fee type is used in ${invoiceItemCount} invoice item(s)` }]
+      );
     }
 
     feeType.is_active = false;

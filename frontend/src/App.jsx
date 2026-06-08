@@ -10,6 +10,7 @@ import PaymentPage from './pages/billing/PaymentPage';
 import HouseholdDetailPage from './pages/households/HouseholdDetailPage';
 import HouseholdsListPage from './pages/households/HouseholdsListPage';
 import FeeListPage from './pages/fees/FeeListPage';
+import FeeTypeListPage from './pages/fees/FeeTypeListPage';
 import FeePeriodForm from './pages/fees/FeePeriodForm';
 import UtilityInvoiceForm from './pages/fees/UtilityInvoiceForm';
 
@@ -122,6 +123,14 @@ function App() {
           element={
             <ProtectedRoute>
               <UtilityInvoiceForm />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/fee-types"
+          element={
+            <ProtectedRoute>
+              <FeeTypeListPage />
             </ProtectedRoute>
           }
         />
