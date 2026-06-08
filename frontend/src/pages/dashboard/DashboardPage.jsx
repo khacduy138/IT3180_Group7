@@ -52,7 +52,12 @@ import {
 } from "../../components/ui/Table";
 import { Tag } from "../../components/ui/Tag";
 import { Toast } from "../../components/ui/Toast";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "../../components/ui/Tabs";
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+} from "../../components/ui/Tabs";
 import { Select } from "../../components/ui/Select";
 import { Input } from "../../components/ui/Input";
 
@@ -99,18 +104,26 @@ export default function DashboardPage() {
   };
 
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
-const [exportConfig, setExportConfig] = useState({
-  timeFrame: "1",
-  customDate: { start: "", end: "" },
-  format: "excel",
-  people: { columns: ["name", "cccd"], filters: { household: "all" } },
-  household: { columns: ["room", "area"], filters: { floor: "all" } },
-  invoice: { columns: ["id", "amount", "status"], filters: { household: "all", type: "all" } }
-});
+  const [exportConfig, setExportConfig] = useState({
+    timeFrame: "1",
+    customDate: { start: "", end: "" },
+    format: "excel",
+    people: { columns: ["name", "cccd"], filters: { household: "all" } },
+    household: { columns: ["room", "area"], filters: { floor: "all" } },
+    invoice: {
+      columns: ["id", "amount", "status"],
+      filters: { household: "all", type: "all" },
+    },
+  });
+  const [filterOptions, setFilterOptions] = useState({
+    households: [],
+    floors: [],
+    feeTypes: [],
+  });
 
-const handleExport = () => {
-  setIsExportModalOpen(true);
-};
+  const handleExport = () => {
+    setIsExportModalOpen(true);
+  };
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -200,6 +213,66 @@ const handleExport = () => {
   const malePercent = Math.round((maleCount / totalGender) * 100);
   const femalePercent = 100 - malePercent;
 
+  const [activeExportTab, setActiveExportTab] = useState("people");
+
+  const fetchFilters = async () => {
+    const token = localStorage.getItem("token");
+    const res = await fetch(
+      "http://localhost:3001/api/dashboard/export-filters",
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
+    const result = await res.json();
+    if (result.success) setFilterOptions(result.data);
+  };
+
+  useEffect(() => {
+    if (isExportModalOpen) fetchFilters();
+  }, [isExportModalOpen]);
+
+  const handleConfirmExport = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(
+        "http://localhost:3001/api/dashboard/export",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            timeFrame: exportConfig.timeFrame,
+            customDate: exportConfig.customDate,
+            format: exportConfig.format,
+            activeTab: activeExportTab,
+            config: exportConfig[activeExportTab],
+          }),
+        },
+      );
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `baocao_${activeExportTab}_${Date.now()}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setIsExportModalOpen(false);
+      }
+    } catch (error) {
+      setToast({
+        open: true,
+        variant: "error",
+        title: "lỗi",
+        description: "không thể xuất file",
+      });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <TopBar
@@ -233,7 +306,11 @@ const handleExport = () => {
                     Chào mừng quay trở lại, Admin.
                   </p>
                 </div>
-                <Button variant="default" className="gap-2" onClick={handleExport}>
+                <Button
+                  variant="default"
+                  className="gap-2"
+                  onClick={handleExport}
+                >
                   <Download size={18} /> Export report
                 </Button>
               </div>
@@ -852,141 +929,304 @@ const handleExport = () => {
       </Modal>
 
       <Modal open={isExportModalOpen} onOpenChange={setIsExportModalOpen}>
-  <ModalHeader>Cấu hình xuất dữ liệu</ModalHeader>
-  <ModalBody className="space-y-6">
-    <div className="space-y-3">
-      <p className="text-sm font-medium text-foreground">Phạm vi thời gian</p>
-      <Select
-        value={exportConfig.timeFrame}
-        onValueChange={(val) => setExportConfig({ ...exportConfig, timeFrame: val })}
-        options={[
-          { value: "1", label: "Trong 1 tháng gần nhất" },
-          { value: "3", label: "Trong 3 tháng gần nhất" },
-          { value: "6", label: "Trong 6 tháng gần nhất" },
-          { value: "custom", label: "Tùy chọn khoảng thời gian" }
-        ]}
-        className="w-full"
-      />
-      {exportConfig.timeFrame === "custom" && (
-        <div className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg border border-border">
-          <Input 
-            type="date" 
-            value={exportConfig.customDate.start}
-            onChange={(e) => setExportConfig({...exportConfig, customDate: {...exportConfig.customDate, start: e.target.value}})}
-            className="bg-transparent border-none h-8" 
-          />
-          <span className="text-muted-foreground">→</span>
-          <Input 
-            type="date" 
-            value={exportConfig.customDate.end}
-            onChange={(e) => setExportConfig({...exportConfig, customDate: {...exportConfig.customDate, end: e.target.value}})}
-            className="bg-transparent border-none h-8" 
-          />
-        </div>
-      )}
-    </div>
+        <ModalHeader>Cấu hình xuất dữ liệu</ModalHeader>
+        <ModalBody className="space-y-6">
+          <div className="space-y-3">
+            <p className="text-sm font-medium text-foreground">
+              Phạm vi thời gian
+            </p>
+            <Select
+              value={exportConfig.timeFrame}
+              onValueChange={(val) =>
+                setExportConfig({ ...exportConfig, timeFrame: val })
+              }
+              options={[
+                { value: "1", label: "Trong 1 tháng gần nhất" },
+                { value: "3", label: "Trong 3 tháng gần nhất" },
+                { value: "6", label: "Trong 6 tháng gần nhất" },
+                { value: "custom", label: "Tùy chọn khoảng thời gian" },
+              ]}
+              className="w-full"
+            />
+            {exportConfig.timeFrame === "custom" && (
+              <div className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg border border-border">
+                <Input
+                  type="date"
+                  value={exportConfig.customDate.start}
+                  onChange={(e) =>
+                    setExportConfig({
+                      ...exportConfig,
+                      customDate: {
+                        ...exportConfig.customDate,
+                        start: e.target.value,
+                      },
+                    })
+                  }
+                  className="bg-transparent border-none h-8"
+                />
+                <span className="text-muted-foreground">→</span>
+                <Input
+                  type="date"
+                  value={exportConfig.customDate.end}
+                  onChange={(e) =>
+                    setExportConfig({
+                      ...exportConfig,
+                      customDate: {
+                        ...exportConfig.customDate,
+                        end: e.target.value,
+                      },
+                    })
+                  }
+                  className="bg-transparent border-none h-8"
+                />
+              </div>
+            )}
+          </div>
 
-    <Tabs defaultValue="people" className="w-full">
-      <TabsList className="w-full justify-start border-b border-border rounded-none bg-transparent h-auto p-0 mb-4">
-        <TabsTrigger value="people" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2">Người dân</TabsTrigger>
-        <TabsTrigger value="household" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2">Hộ gia đình</TabsTrigger>
-        <TabsTrigger value="invoice" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2">Hóa đơn</TabsTrigger>
-      </TabsList>
-
-      <TabsContent value="people" className="space-y-4">
-        <div className="grid grid-cols-2 gap-3">
-          {["Họ tên", "Căn cước công dân", "Số điện thoại", "Giới tính", "Ngày sinh"].map((col) => (
-            <label key={col} className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
-              <input type="checkbox" defaultChecked className="accent-primary h-4 w-4" />
-              {col}
-            </label>
-          ))}
-        </div>
-        <div className="pt-4 border-t border-border">
-          <p className="text-xs font-bold text-muted-foreground uppercase mb-2">Bộ lọc nâng cao</p>
-          <Select
-            placeholder="Lọc theo hộ gia đình"
-            options={[{ value: "all", label: "Tất cả hộ gia đình" }, { value: "p101", label: "Phòng P101" }]}
+          <Tabs
+            value={activeExportTab}
+            onValueChange={setActiveExportTab}
             className="w-full"
-          />
-        </div>
-      </TabsContent>
+          >
+            <TabsList className="w-full justify-start border-b border-border rounded-none bg-transparent h-auto p-0 mb-4">
+              <TabsTrigger
+                value="people"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2"
+              >
+                Người dân
+              </TabsTrigger>
+              <TabsTrigger
+                value="household"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2"
+              >
+                Hộ gia đình
+              </TabsTrigger>
+              <TabsTrigger
+                value="invoice"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2"
+              >
+                Hóa đơn
+              </TabsTrigger>
+            </TabsList>
 
-      <TabsContent value="household" className="space-y-4">
-        <div className="grid grid-cols-2 gap-3">
-          {["Số phòng", "Diện tích", "Trạng thái", "Tầng", "Số nhân khẩu"].map((col) => (
-            <label key={col} className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
-              <input type="checkbox" defaultChecked className="accent-primary h-4 w-4" />
-              {col}
-            </label>
-          ))}
-        </div>
-        <div className="pt-4 border-t border-border">
-          <p className="text-xs font-bold text-muted-foreground uppercase mb-2">Bộ lọc nâng cao</p>
-          <Select
-            placeholder="Lọc theo tầng"
-            options={[{ value: "all", label: "Tất cả các tầng" }, { value: "1", label: "Tầng 1" }]}
-            className="w-full"
-          />
-        </div>
-      </TabsContent>
+            <TabsContent value="people" className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { id: "full_name", label: "họ tên" },
+                  { id: "citizen_id", label: "căn cước công dân" },
+                  { id: "phone_number", label: "số điện thoại" },
+                  { id: "gender", label: "giới tính" },
+                  { id: "date_of_birth", label: "ngày sinh" },
+                ].map((col) => (
+                  <label
+                    key={col.id}
+                    className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={exportConfig.people.columns.includes(col.id)}
+                      onChange={(e) => {
+                        const cols = e.target.checked
+                          ? [...exportConfig.people.columns, col.id]
+                          : exportConfig.people.columns.filter(
+                              (c) => c !== col.id,
+                            );
+                        setExportConfig({
+                          ...exportConfig,
+                          people: { ...exportConfig.people, columns: cols },
+                        });
+                      }}
+                      className="accent-primary h-4 w-4"
+                    />
+                    {col.label}
+                  </label>
+                ))}
+              </div>
+              <div className="pt-4 border-t border-border">
+                <p className="text-xs font-bold text-muted-foreground uppercase mb-2">
+                  bộ lọc nâng cao
+                </p>
+                <Select
+                  placeholder="lọc theo hộ gia đình"
+                  value={exportConfig.people.filters.household}
+                  onValueChange={(val) =>
+                    setExportConfig({
+                      ...exportConfig,
+                      people: {
+                        ...exportConfig.people,
+                        filters: { household: val },
+                      },
+                    })
+                  }
+                  options={[
+                    { value: "all", label: "tất cả hộ gia đình" },
+                    ...filterOptions.households,
+                  ]}
+                  className="w-full"
+                />
+              </div>
+            </TabsContent>
 
-      <TabsContent value="invoice" className="space-y-4">
-        <div className="grid grid-cols-2 gap-3">
-          {["Mã hóa đơn", "Kỳ thu", "Tổng tiền", "Đã nộp", "Còn nợ", "Trạng thái"].map((col) => (
-            <label key={col} className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
-              <input type="checkbox" defaultChecked className="accent-primary h-4 w-4" />
-              {col}
-            </label>
-          ))}
-        </div>
-        <div className="grid grid-cols-2 gap-2 pt-4 border-t border-border">
-          <div className="col-span-2 text-xs font-bold text-muted-foreground uppercase mb-1">Bộ lọc nâng cao</div>
-          <Select
-            placeholder="Theo phòng"
-            options={[{ value: "all", label: "Tất cả phòng" }]}
-          />
-          <Select
-            placeholder="Theo loại phí"
-            options={[{ value: "all", label: "Tất cả loại phí" }]}
-          />
-        </div>
-      </TabsContent>
-    </Tabs>
+            <TabsContent value="household" className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { id: "room_number", label: "số phòng" },
+                  { id: "square_meters", label: "diện tích" },
+                  { id: "status", label: "trạng thái" },
+                ].map((col) => (
+                  <label
+                    key={col.id}
+                    className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={exportConfig.household.columns.includes(col.id)}
+                      onChange={(e) => {
+                        const cols = e.target.checked
+                          ? [...exportConfig.household.columns, col.id]
+                          : exportConfig.household.columns.filter(
+                              (c) => c !== col.id,
+                            );
+                        setExportConfig({
+                          ...exportConfig,
+                          household: {
+                            ...exportConfig.household,
+                            columns: cols,
+                          },
+                        });
+                      }}
+                      className="accent-primary h-4 w-4"
+                    />
+                    {col.label}
+                  </label>
+                ))}
+              </div>
+            </TabsContent>
 
-    <div className="pt-4 border-t border-border space-y-3">
-      <p className="text-sm font-medium text-foreground">Định dạng tập tin</p>
-      <div className="flex gap-4">
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input 
-            type="radio" 
-            name="format" 
-            value="excel" 
-            checked={exportConfig.format === "excel"}
-            onChange={(e) => setExportConfig({...exportConfig, format: e.target.value})}
-            className="accent-primary h-4 w-4" 
-          />
-          <span className="text-sm text-foreground">Microsoft excel (.xlsx)</span>
-        </label>
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input 
-            type="radio" 
-            name="format" 
-            value="pdf" 
-            checked={exportConfig.format === "pdf"}
-            onChange={(e) => setExportConfig({...exportConfig, format: e.target.value})}
-            className="accent-primary h-4 w-4" 
-          />
-          <span className="text-sm text-foreground">Portable document (.pdf)</span>
-        </label>
-      </div>
-    </div>
-  </ModalBody>
-  <ModalFooter>
-    <Button variant="outline" onClick={() => setIsExportModalOpen(false)}>Đóng</Button>
-    <Button variant="default" onClick={() => setIsExportModalOpen(false)}>Bắt đầu xuất dữ liệu</Button>
-  </ModalFooter>
-</Modal>
+            <TabsContent value="invoice" className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { id: "invoice_number", label: "mã hóa đơn" },
+                  { id: "total_amount", label: "tổng tiền" },
+                  { id: "paid_amount", label: "đã nộp" },
+                  { id: "status", label: "trạng thái" },
+                ].map((col) => (
+                  <label
+                    key={col.id}
+                    className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={exportConfig.invoice.columns.includes(col.id)}
+                      onChange={(e) => {
+                        const cols = e.target.checked
+                          ? [...exportConfig.invoice.columns, col.id]
+                          : exportConfig.invoice.columns.filter(
+                              (c) => c !== col.id,
+                            );
+                        setExportConfig({
+                          ...exportConfig,
+                          invoice: { ...exportConfig.invoice, columns: cols },
+                        });
+                      }}
+                      className="accent-primary h-4 w-4"
+                    />
+                    {col.label}
+                  </label>
+                ))}
+              </div>
+              <div className="grid grid-cols-2 gap-2 pt-4 border-t border-border">
+                <div className="col-span-2 text-xs font-bold text-muted-foreground uppercase mb-1">
+                  bộ lọc nâng cao
+                </div>
+                <Select
+                  placeholder="theo phòng"
+                  value={exportConfig.invoice.filters.household}
+                  onValueChange={(val) =>
+                    setExportConfig({
+                      ...exportConfig,
+                      invoice: {
+                        ...exportConfig.invoice,
+                        filters: {
+                          ...exportConfig.invoice.filters,
+                          household: val,
+                        },
+                      },
+                    })
+                  }
+                  options={[
+                    { value: "all", label: "tất cả phòng" },
+                    ...filterOptions.households,
+                  ]}
+                />
+                <Select
+                  placeholder="theo loại phí"
+                  value={exportConfig.invoice.filters.type}
+                  onValueChange={(val) =>
+                    setExportConfig({
+                      ...exportConfig,
+                      invoice: {
+                        ...exportConfig.invoice,
+                        filters: { ...exportConfig.invoice.filters, type: val },
+                      },
+                    })
+                  }
+                  options={[
+                    { value: "all", label: "tất cả loại phí" },
+                    ...filterOptions.feeTypes,
+                  ]}
+                />
+              </div>
+            </TabsContent>
+          </Tabs>
+
+          <div className="pt-4 border-t border-border space-y-3">
+            <p className="text-sm font-medium text-foreground">
+              Định dạng tập tin
+            </p>
+            <div className="flex gap-4">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="format"
+                  value="excel"
+                  checked={exportConfig.format === "excel"}
+                  onChange={(e) =>
+                    setExportConfig({ ...exportConfig, format: e.target.value })
+                  }
+                  className="accent-primary h-4 w-4"
+                />
+                <span className="text-sm text-foreground">
+                  Microsoft excel (.xlsx)
+                </span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="format"
+                  value="pdf"
+                  checked={exportConfig.format === "pdf"}
+                  onChange={(e) =>
+                    setExportConfig({ ...exportConfig, format: e.target.value })
+                  }
+                  className="accent-primary h-4 w-4"
+                />
+                <span className="text-sm text-foreground">
+                  Portable document (.pdf)
+                </span>
+              </label>
+            </div>
+          </div>
+        </ModalBody>
+        <ModalFooter>
+          <Button variant="outline" onClick={() => setIsExportModalOpen(false)}>
+            Đóng
+          </Button>
+          <Button variant="default" onClick={handleConfirmExport}>
+            Bắt đầu xuất dữ liệu
+          </Button>
+        </ModalFooter>
+      </Modal>
     </div>
   );
 }

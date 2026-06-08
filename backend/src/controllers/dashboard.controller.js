@@ -3,6 +3,7 @@ const {
   Invoice, Household, Resident, FeePeriod, 
   Payment, InvoiceItem, FeeType, DemographicChange
 } = require('../models');
+const ExcelJS = require('exceljs');
 
 const getSummary = async (req, res) => {
   try {
@@ -292,6 +293,105 @@ const getDemographicStats = async (req, res) => {
   }
 };
 
+const getExportFilters = async (req, res) => {
+  try {
+    const households = await Household.findAll({
+      where: { deleted_at: null },
+      attributes: ['id', 'room_number'],
+      order: [['room_number', 'ASC']]
+    });
+
+    const feeTypes = await FeeType.findAll({
+      attributes: ['id', 'name'],
+      order: [['name', 'ASC']]
+    });
+
+    return res.json({
+      success: true,
+      data: {
+        households: households.map(h => ({ value: h.id.toString(), label: `phòng ${h.room_number}` })),
+        feeTypes: feeTypes.map(ft => ({ value: ft.id.toString(), label: ft.name }))
+      }
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const exportData = async (req, res) => {
+  try {
+    const { timeFrame, customDate, format, activeTab, config } = req.body;
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('báo cáo');
+
+    let startDate;
+    if (timeFrame === 'custom') {
+      startDate = new Date(customDate.start);
+    } else {
+      startDate = new Date();
+      startDate.setMonth(startDate.getMonth() - parseInt(timeFrame));
+    }
+
+    const dateFilter = { created_at: { [Op.gte]: startDate } };
+
+    if (activeTab === 'people') {
+      const where = { ...dateFilter };
+      if (config.filters.household !== 'all') where['$households.id$'] = config.filters.household;
+
+      const data = await Resident.findAll({
+        include: [{ model: Household, as: 'households', through: { attributes: [] } }],
+        where
+      });
+
+      const columns = [];
+      if (config.columns.includes('full_name')) columns.push({ header: 'họ tên', key: 'full_name', width: 25 });
+      if (config.columns.includes('citizen_id')) columns.push({ header: 'cccd', key: 'citizen_id', width: 20 });
+      if (config.columns.includes('phone_number')) columns.push({ header: 'sđt', key: 'phone_number', width: 15 });
+      if (config.columns.includes('gender')) columns.push({ header: 'giới tính', key: 'gender', width: 10 });
+      if (config.columns.includes('date_of_birth')) columns.push({ header: 'ngày sinh', key: 'date_of_birth', width: 15 });
+      worksheet.columns = columns;
+      data.forEach(item => worksheet.addRow(item.get({ plain: true })));
+    }
+
+    if (activeTab === 'household') {
+      const where = { ...dateFilter, deleted_at: null };
+      const data = await Household.findAll({ where });
+      
+      const columns = [];
+      if (config.columns.includes('room_number')) columns.push({ header: 'số phòng', key: 'room_number', width: 15 });
+      if (config.columns.includes('square_meters')) columns.push({ header: 'diện tích', key: 'square_meters', width: 15 });
+      if (config.columns.includes('status')) columns.push({ header: 'trạng thái', key: 'status', width: 15 });
+      worksheet.columns = columns;
+      data.forEach(item => worksheet.addRow(item.get({ plain: true })));
+    }
+
+    if (activeTab === 'invoice') {
+      const where = { ...dateFilter };
+      if (config.filters.household !== 'all') where.household_id = config.filters.household;
+
+      const data = await Invoice.findAll({
+        where,
+        include: [{ model: Household, as: 'household' }]
+      });
+
+      const columns = [];
+      if (config.columns.includes('invoice_number')) columns.push({ header: 'mã hóa đơn', key: 'invoice_number', width: 20 });
+      if (config.columns.includes('total_amount')) columns.push({ header: 'tổng tiền', key: 'total_amount', width: 15 });
+      if (config.columns.includes('paid_amount')) columns.push({ header: 'đã nộp', key: 'paid_amount', width: 15 });
+      if (config.columns.includes('status')) columns.push({ header: 'trạng thái', key: 'status', width: 15 });
+      worksheet.columns = columns;
+      data.forEach(item => worksheet.addRow(item.get({ plain: true })));
+    }
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename=report.xlsx');
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   getSummary,
   getReportByPeriod,
@@ -299,5 +399,7 @@ module.exports = {
   getTrending,
   getFeeDistribution,
   getRecentPayments,
-  getDemographicStats
+  getDemographicStats,
+  getExportFilters,
+  exportData
 };

@@ -15,4 +15,8 @@ router.get('/reports/by-period', authorize({ roles: ['admin', 'accountant'] }), 
 router.get('/demographics', authorize({ roles: ['admin', 'staff', 'accountant'] }), dashboardController.getDemographicStats );
 router.get('/search', dashboardController.globalSearch);
 
+router.get('/export-filters', authorize({ roles: ['admin', 'accountant'] }), dashboardController.getExportFilters);
+router.post('/export', authorize({ roles: ['admin', 'accountant'] }), dashboardController.exportData);
+
+
 module.exports = router;
