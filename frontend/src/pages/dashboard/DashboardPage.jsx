@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   BarChart,
   Bar,
@@ -20,8 +21,8 @@ import {
   Home,
   CreditCard,
   AlertCircle,
-  Activity,
   Filter,
+  ExternalLink 
 } from "lucide-react";
 
 // Import Layout & UI Components
@@ -69,6 +70,7 @@ const STATUS_MAP = {
 };
 
 export default function DashboardPage() {
+  const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [stats, setStats] = useState({
     totalCollected: 0,
@@ -363,7 +365,7 @@ export default function DashboardPage() {
                   className="gap-2"
                   onClick={handleExport}
                 >
-                  <Download size={18} /> Export report
+                  <Download size={18} /> Quick export
                 </Button>
               </div>
               <SmartSearch
@@ -707,9 +709,14 @@ export default function DashboardPage() {
 
               <div className="rounded-xl border border-border bg-card p-6 shadow-sm space-y-6">
                 <div className="items-center justify-between gap-4">
+                    <div className="flex items-center justify-between mb-4">
                   <h2 className="text-xl font-semibold mb-4">
                     Tình trạng thu phí hệ thống
                   </h2>
+                  <Button variant="default" size="sm" onClick={() => navigate("/reports")}>
+                    <ExternalLink  size={16} /> Xem chi tiết
+                  </Button>
+                  </div>
                   <div className="flex flex-wrap justify-between items-center gap-3">
                     <div className=""> 
                     <Input

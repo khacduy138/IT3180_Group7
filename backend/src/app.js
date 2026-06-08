@@ -22,6 +22,8 @@ app.use('/api/billing', require('./routes/billing.routes'));
 app.use('/api/invoices', require('./routes/invoiceAliases.routes'));
 app.use('/api/payments', require('./routes/payments.routes'));
 app.use('/api/dashboard', require('./routes/dashboard.routes'));
+app.use('/api/reports', require('./routes/reports.routes'));
+
 
 app.use((req, res) => {
   res.status(404).json({
