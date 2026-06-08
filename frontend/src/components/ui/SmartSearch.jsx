@@ -169,7 +169,10 @@ export default function SmartSearch({
                       <div
                         key={item.id}
                         className="p-3 hover:bg-muted rounded-xl cursor-pointer"
-                        onClick={() => onResultSelect(key, item)}
+                        onClick={() => {
+                          onResultSelect(key, item);
+                          setIsOpen(false);
+                        }}
                       >
                         <div className="font-bold text-sm">
                           {item.invoice_number ||

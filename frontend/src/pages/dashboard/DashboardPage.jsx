@@ -34,6 +34,12 @@ import {
   CardFooter,
 } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
+import {
+  Modal,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+} from "../../components/ui/Modal";
 import SmartSearch from "../../components/ui/SmartSearch";
 import { Spinner } from "../../components/ui/Spinner";
 import {
@@ -46,7 +52,6 @@ import {
 } from "../../components/ui/Table";
 import { Tag } from "../../components/ui/Tag";
 import { Toast } from "../../components/ui/Toast";
-
 
 const STATUS_MAP = {
   PAID: { label: "Đã nộp", color: "green" },
@@ -82,6 +87,13 @@ export default function DashboardPage() {
     title: "",
     description: "",
   });
+
+  const [selectedItem, setSelectedItem] = useState(null); // { type: 'residents', data: {...} }
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const handleResultSelect = (type, data) => {
+    setSelectedItem({ type, data });
+    setIsDetailModalOpen(true);
+  };
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -163,11 +175,13 @@ export default function DashboardPage() {
       currency: "VND",
     }).format(val);
 
-  const maleCount = demoData.genderDistribution.find((g) => g.gender === "Male")?.count || 0;
-  const femaleCount = demoData.genderDistribution.find((g) => g.gender === "Female")?.count || 0;
+  const maleCount =
+    demoData.genderDistribution.find((g) => g.gender === "Male")?.count || 0;
+  const femaleCount =
+    demoData.genderDistribution.find((g) => g.gender === "Female")?.count || 0;
   const totalGender = maleCount + femaleCount || 1;
   const malePercent = Math.round((maleCount / totalGender) * 100);
-  const femalePercent = 100 - malePercent; 
+  const femalePercent = 100 - malePercent;
 
   return (
     <div className="min-h-screen bg-background">
@@ -206,17 +220,15 @@ export default function DashboardPage() {
                   <Download size={18} /> Export report
                 </Button>
               </div>
-              <SmartSearch 
-                    endpoint="http://localhost:3001/api/dashboard/search"
-                    categories={[
-                    { value: 'all', label: 'Tất cả' },
-                    { value: 'people', label: 'Nhân khẩu' },
-                    { value: 'finance', label: 'Tài chính' }
-                    ]}
-                    placeholder="Tra cứu cư dân, hóa đơn hoặc số phòng..."
-                    onResultSelect={(type, item) => {
-                    console.log(`Bạn đã chọn ${type}:`, item);
-                    }}
+              <SmartSearch
+                endpoint="http://localhost:3001/api/dashboard/search"
+                categories={[
+                  { value: "all", label: "Tất cả" },
+                  { value: "people", label: "Nhân khẩu" },
+                  { value: "finance", label: "Tài chính" },
+                ]}
+                placeholder="Tra cứu cư dân, hóa đơn hoặc số phòng..."
+                onResultSelect={handleResultSelect}
               />
 
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
@@ -227,8 +239,11 @@ export default function DashboardPage() {
                   </CardHeader>
                   <CardValue>{formatCurrency(stats.totalCollected)}</CardValue>
                   <CardFooter>
-                    <p className={`text-xs font-medium ${stats.revenueGrowth >= 0 ? "text-green-500" : "text-red-500"}`}>
-                        {stats.revenueGrowth >= 0 ? "↑" : "↓"} {Math.abs(stats.revenueGrowth)}% so với tháng trước
+                    <p
+                      className={`text-xs font-medium ${stats.revenueGrowth >= 0 ? "text-green-500" : "text-red-500"}`}
+                    >
+                      {stats.revenueGrowth >= 0 ? "↑" : "↓"}{" "}
+                      {Math.abs(stats.revenueGrowth)}% so với tháng trước
                     </p>
                   </CardFooter>
                 </Card>
@@ -270,7 +285,7 @@ export default function DashboardPage() {
                   <CardValue>{stats.totalHouseholds}</CardValue>
                   <CardFooter>
                     <p className="text-xs text-muted-foreground">
-                        {stats.occupancyRate}% đang có người ở
+                      {stats.occupancyRate}% đang có người ở
                     </p>
                   </CardFooter>
                 </Card>
@@ -279,13 +294,9 @@ export default function DashboardPage() {
               <div className="grid gap-6 md:grid-cols-3 mt-6">
                 <Card>
                   <CardHeader className="pb-2">
-                    <CardTitle >
-                      Tổng cư dân
-                    </CardTitle>
+                    <CardTitle>Tổng cư dân</CardTitle>
                   </CardHeader>
-                  <CardValue>
-                    {demoData.totalResidents}
-                  </CardValue>
+                  <CardValue>{demoData.totalResidents}</CardValue>
                   <CardFooter>
                     <p className="text-xs text-muted-foreground">
                       Người dân đang sinh sống
@@ -295,13 +306,9 @@ export default function DashboardPage() {
 
                 <Card>
                   <CardHeader className="pb-2">
-                    <CardTitle>
-                      Biến động mới
-                    </CardTitle>
+                    <CardTitle>Biến động mới</CardTitle>
                   </CardHeader>
-                  <CardValue >
-                    +{demoData.recentChangesCount}
-                  </CardValue>
+                  <CardValue>+{demoData.recentChangesCount}</CardValue>
                   <CardFooter>
                     <p className="text-xs text-muted-foreground">
                       Trong 30 ngày qua
@@ -311,9 +318,7 @@ export default function DashboardPage() {
 
                 <Card>
                   <CardHeader className="pb-2">
-                    <CardTitle >
-                      Tạm vắng / Tạm trú
-                    </CardTitle>
+                    <CardTitle>Tạm vắng / Tạm trú</CardTitle>
                   </CardHeader>
                   <CardValue>
                     {demoData.changesSummary.find(
@@ -541,14 +546,14 @@ export default function DashboardPage() {
                       </div>
                       <div className="w-full bg-muted rounded-full h-2 flex overflow-hidden">
                         <div
-                            className="bg-blue-600 h-full transition-all duration-500"
-                            style={{ width: `${malePercent}%` }}
+                          className="bg-blue-600 h-full transition-all duration-500"
+                          style={{ width: `${malePercent}%` }}
                         ></div>
                         <div
-                            className="bg-blue-400 h-full transition-all duration-500"
-                            style={{ width: `${femalePercent}%` }}
+                          className="bg-blue-400 h-full transition-all duration-500"
+                          style={{ width: `${femalePercent}%` }}
                         ></div>
-                        </div>
+                      </div>
                     </div>
                   </Card>
                 </div>
@@ -628,6 +633,206 @@ export default function DashboardPage() {
         title={toast.title}
         description={toast.description}
       />
+      <Modal open={isDetailModalOpen} onOpenChange={setIsDetailModalOpen}>
+        <ModalHeader>
+          {selectedItem?.type === "residents" && "Thông tin chi tiết Cư dân"}
+          {selectedItem?.type === "households" && "Thông tin chi tiết Căn hộ"}
+          {selectedItem?.type === "invoices" && "Thông tin chi tiết Hóa đơn"}
+        </ModalHeader>
+        <ModalBody>
+          {selectedItem && (
+            <div className="space-y-6">
+              {selectedItem.type === "residents" && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2 flex items-center gap-4 p-4 rounded-xl border border-border">
+                    <div className="border border-border h-16 w-16 rounded-full  flex items-center justify-center text-2xl font-bold">
+                      {selectedItem.data.full_name?.charAt(0)}
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold">
+                        {selectedItem.data.full_name}
+                      </h3>
+                      <Tag color="green">Cư dân chính thức</Tag>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">
+                      Số định danh (CCCD)
+                    </p>
+                    <p className="font-medium">
+                      {selectedItem.data.citizen_id || "Chưa cập nhật"}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">
+                      Số điện thoại
+                    </p>
+                    <p className="font-medium text-primary underline">
+                      {selectedItem.data.phone_number || "Chưa có"}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">
+                      Giới tính
+                    </p>
+                    <p className="font-medium">{selectedItem.data.gender}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">
+                      Ngày sinh
+                    </p>
+                    <p className="font-medium">
+                      {new Date(
+                        selectedItem.data.created_at,
+                      ).toLocaleDateString("vi-VN")}
+                    </p>
+                  </div>
+                  <div className="col-span-2 pt-2 border-t border-border">
+                    <p className="text-[10px] uppercase font-bold text-muted-foreground mb-2">
+                      Mã định danh hệ thống (UUID)
+                    </p>
+                    <code className="text-[10px] bg-muted p-2 rounded block break-all">
+                      {selectedItem.data.uuid}
+                    </code>
+                  </div>
+                </div>
+              )}
+
+              {selectedItem.type === "households" && (
+                <div className="space-y-4">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="text-lg font-black text-primary">
+                        Phòng {selectedItem.data.room_number}
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        Tình trạng:{" "}
+                        {selectedItem.data.status === "active"
+                          ? "Đang hoạt động"
+                          : "Trống"}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-bold">
+                        {selectedItem.data.square_meters}{" "}
+                        <span className="text-sm">m²</span>
+                      </p>
+                      <p className="text-[10px]  text-muted-foreground">
+                        Diện tích thông thủy
+                      </p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="border border-border p-3 rounded-xl text-center">
+                      <p className="text-xs text-muted-foreground">Tầng</p>
+                      <p>{selectedItem.data.room_number?.substring(1, 2)}</p>
+                    </div>
+                    <div className="border border-border p-3 rounded-xl text-center">
+                      <p className="text-xs text-muted-foreground">Phân khu</p>
+                      <p>
+                        Block {selectedItem.data.room_number?.substring(0, 1)}
+                      </p>
+                    </div>
+                    <div className="border border-border p-3 rounded-xl text-center">
+                      <p className="text-xs text-muted-foreground">Hướng</p>
+                      <p>Đông Nam</p>
+                    </div>
+                  </div>
+                  <div className="p-4 rounded-xl border border-dashed border-border">
+                    <p className="text-xs text-muted-foreground italic">
+                      "Căn hộ thuộc diện quản lý ưu tiên, không có tranh chấp nợ
+                      phí trong 3 tháng gần nhất."
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {selectedItem.type === "invoices" && (
+                <div className="space-y-5">
+                  <div className="flex justify-between items-center border-b border-border pb-4">
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase">
+                        Mã hóa đơn
+                      </p>
+                      <p className="text-lg font-mono font-bold text-primary">
+                        {selectedItem.data.invoice_number}
+                      </p>
+                    </div>
+                    <Tag
+                      color={
+                        selectedItem.data.status === "PAID" ? "green" : "yellow"
+                      }
+                    >
+                      {selectedItem.data.status}
+                    </Tag>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Tổng cộng:</span>
+                      <span className="font-bold">
+                        {new Intl.NumberFormat("vi-VN").format(
+                          selectedItem.data.total_amount,
+                        )}
+                        đ
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">
+                        Đã thanh toán:
+                      </span>
+                      <span className="font-bold text-green-600">
+                        {new Intl.NumberFormat("vi-VN").format(
+                          selectedItem.data.paid_amount,
+                        )}
+                        đ
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm p-3 rounded-lg ">
+                      <span className="font-bold">Còn nợ:</span>
+                      <span className="font-black">
+                        {new Intl.NumberFormat("vi-VN").format(
+                          selectedItem.data.total_amount -
+                            selectedItem.data.paid_amount,
+                        )}
+                        đ
+                      </span>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase">
+                      Ghi chú hệ thống
+                    </p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Hóa đơn được khởi tạo tự động vào ngày{" "}
+                      {new Date(
+                        selectedItem.data.created_at,
+                      ).toLocaleDateString("vi-VN")}
+                      . Hạn nộp cuối cùng: 30/
+                      {new Date(selectedItem.data.created_at).getMonth() + 1}
+                      /2026.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </ModalBody>
+        <ModalFooter>
+          <Button variant="outline" onClick={() => setIsDetailModalOpen(false)}>
+            Đóng
+          </Button>
+          <Button
+            variant="default"
+            onClick={() => {
+              setIsDetailModalOpen(false);
+              if (selectedItem.type === "households")
+                window.location.href = `/households/${selectedItem.data.id}`;
+            }}
+          >
+            Xem chi tiết hồ sơ
+          </Button>
+        </ModalFooter>
+      </Modal>
     </div>
   );
 }
