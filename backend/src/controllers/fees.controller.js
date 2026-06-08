@@ -1,3 +1,4 @@
+const Decimal = require('decimal.js');
 const {
   sequelize,
   FeeType,
@@ -583,22 +584,24 @@ const calculateUtilityAmount = ({
   usageAmount,
   unitPrice,
 }) => {
-  const unitPriceNumber = Number(unitPrice);
-  let usageAmountNumber = Number(usageAmount);
+  const unitPriceDecimal = new Decimal(String(unitPrice || 0));
+  let usageDecimal;
 
   if (
     Number.isFinite(Number(previousReading)) &&
     Number.isFinite(Number(currentReading))
   ) {
-    usageAmountNumber = Number(currentReading) - Number(previousReading);
+    usageDecimal = new Decimal(String(currentReading)).minus(new Decimal(String(previousReading)));
+  } else {
+    usageDecimal = new Decimal(String(usageAmount || 0));
   }
 
-  const totalAmount = Number((usageAmountNumber * unitPriceNumber).toFixed(2));
+  const totalDecimal = usageDecimal.times(unitPriceDecimal).toDecimalPlaces(2);
 
   return {
-    usageAmountNumber,
-    unitPriceNumber,
-    totalAmount,
+    usageAmountNumber: usageDecimal.toNumber(),
+    unitPriceNumber: unitPriceDecimal.toNumber(),
+    totalAmount: totalDecimal.toNumber(),
   };
 };
 
@@ -716,8 +719,18 @@ const createUtilityInvoice = async (req, res, next) => {
       return sendError(res, 404, 'Fee period not found');
     }
 
+    if (feePeriod.status !== 'ACTIVE') {
+      return sendError(res, 422, 'Fee period must be active to record utility invoices', [
+        { field: 'feePeriodId', code: 'VAL_003', message: 'Fee period is not active' },
+      ]);
+    }
+
     const household = await Household.findByPk(householdId);
     if (!household) {
+      return sendError(res, 404, 'Household not found');
+    }
+
+    if (household.deleted_at !== null) {
       return sendError(res, 404, 'Household not found');
     }
 

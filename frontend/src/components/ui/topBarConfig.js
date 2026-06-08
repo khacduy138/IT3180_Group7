@@ -50,7 +50,7 @@ export const TOP_BAR_ITEMS = [
     label: "Fees",
     path: "/fees",
     icon: Banknote,
-    allowedRoles: ["admin"],
+    allowedRoles: ["admin", "manager", "accountant"],
   },
   {
     label: "Settings",
