@@ -25,7 +25,7 @@ export default function TopBar({ onToggleSidebar, sidebarOpen }) {
                     >
                     {sidebarOpen ? <SidebarClose className="h-5 w-5" /> : <SidebarOpen className="h-5 w-5" />}
                 </Button>
-                <Input placeholder="Search..." className="w-48" />
+                <Input placeholder="Search..." className="w-44" />
             </div>
             <div className=" flex items-center gap-4 justify-center col-span-2">
                 {visibleItems.map((item) => (

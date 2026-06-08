@@ -13,6 +13,7 @@ import FeeListPage from './pages/fees/FeeListPage';
 import FeeTypeListPage from './pages/fees/FeeTypeListPage';
 import FeePeriodForm from './pages/fees/FeePeriodForm';
 import UtilityInvoiceForm from './pages/fees/UtilityInvoiceForm';
+import ReportPage from './pages/dashboard/ReportPage';
 
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem('token');
@@ -131,6 +132,14 @@ function App() {
           element={
             <ProtectedRoute>
               <FeeTypeListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/reports"
+          element={
+            <ProtectedRoute>
+              <ReportPage />
             </ProtectedRoute>
           }
         />
