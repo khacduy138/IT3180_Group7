@@ -5,6 +5,8 @@ import LoginPage from './pages/auth/LoginPage';
 import DashboardPage from './pages/dashboard/DashboardPage';
 import UserManagementPage from './pages/auth/UserManagementPage';
 import InvoiceListPage from './pages/billing/InvoiceListPage';
+import PaymentHistoryPage from './pages/billing/PaymentHistoryPage';
+import PaymentPage from './pages/billing/PaymentPage';
 import HouseholdDetailPage from './pages/households/HouseholdDetailPage';
 import HouseholdsListPage from './pages/households/HouseholdsListPage';
 import FeeTypeListPage from './pages/fees/FeeTypeListPage';
@@ -63,6 +65,22 @@ function App() {
           element={
             <ProtectedRoute>
               <InvoiceListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/payments"
+          element={
+            <ProtectedRoute>
+              <PaymentPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/payments/history"
+          element={
+            <ProtectedRoute>
+              <PaymentHistoryPage />
             </ProtectedRoute>
           }
         />
