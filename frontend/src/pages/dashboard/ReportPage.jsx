@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Download, FileText, Printer, Filter, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
+import { Download, FileText, Printer, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
 import TopBar from "../../components/ui/TopBar";
 import Sidebar from "../../components/ui/Sidebar";
 import { Card } from "../../components/ui/Card";
@@ -100,6 +100,10 @@ export default function ReportPage() {
       currency: "VND",
     }).format(val);
 
+  const handlePrint = () => {
+    window.print();
+  };
+
   const handleExport = async () => {
     try {
       const token = localStorage.getItem('token');
@@ -152,7 +156,7 @@ export default function ReportPage() {
                 <Button variant="outline" className="gap-2" onClick={handleExport}>
                   <Download size={18} /> Xuất excel
                 </Button>
-                <Button variant="outline" className="gap-2">
+                <Button variant="outline" className="gap-2" onClick={handlePrint}>
                   <Printer size={18} /> In báo cáo
                 </Button>
               </div>

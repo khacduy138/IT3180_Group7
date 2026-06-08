@@ -7,6 +7,7 @@ import {
   Home,
   Wallet,
   History,
+  FileBarChart,
 } from "lucide-react";
 
 export const TOP_BAR_ITEMS = [
@@ -51,6 +52,12 @@ export const TOP_BAR_ITEMS = [
     path: "/fees",
     icon: Banknote,
     allowedRoles: ["admin", "manager", "accountant"],
+  },
+  {
+    label: "Báo cáo",
+    path: "/reports",
+    icon: FileBarChart,
+    allowedRoles: ["admin", "manager", "customer"],
   },
   {
     label: "Settings",
