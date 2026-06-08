@@ -1,7 +1,7 @@
 const { Op, fn, col } = require('sequelize');
 const { 
   Invoice, Household, Resident, FeePeriod, 
-  Payment, InvoiceItem, FeeType 
+  Payment, InvoiceItem, FeeType, DemographicChange
 } = require('../models');
 
 const getSummary = async (req, res) => {
@@ -185,11 +185,61 @@ const globalSearch = async (req, res) => {
   }
 };
 
+const getDemographicStats = async (req, res) => {
+  try {
+    const totalResidents = await Resident.count();
+
+    const genderDistribution = await Resident.findAll({
+      attributes: [
+        'gender',
+        [fn('COUNT', col('id')), 'count']
+      ],
+      group: ['gender'],
+      raw: true
+    });
+
+    const changesSummary = await DemographicChange.findAll({
+      attributes: [
+        'change_type',
+        [fn('COUNT', col('id')), 'count']
+      ],
+      group: ['change_type'],
+      raw: true
+    });
+
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const recentChangesCount = await DemographicChange.count({
+      where: {
+        created_at: { [Op.gte]: thirtyDaysAgo }
+      }
+    });
+
+    res.json({
+      success: true,
+      data: {
+        totalResidents,
+        genderDistribution, 
+        changesSummary,
+        recentChangesCount
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error fetching demographic stats', 
+      error: error.message 
+    });
+  }
+};
+
 module.exports = {
   getSummary,
   getReportByPeriod,
   globalSearch,
   getTrending,
   getFeeDistribution,
-  getRecentPayments
+  getRecentPayments,
+  getDemographicStats
 };

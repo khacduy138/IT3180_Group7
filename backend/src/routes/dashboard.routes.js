@@ -12,6 +12,7 @@ router.get('/distribution', authorize({ roles: ['admin', 'accountant'] }), dashb
 router.get('/recent-payments', authorize({ roles: ['admin', 'accountant', 'staff'] }), dashboardController.getRecentPayments);
 
 router.get('/reports/by-period', authorize({ roles: ['admin', 'accountant'] }), dashboardController.getReportByPeriod);
+router.get('/demographics', authorize({ roles: ['admin', 'staff', 'accountant'] }), dashboardController.getDemographicStats );
 router.get('/search', dashboardController.globalSearch);
 
 module.exports = router;
