@@ -12,7 +12,7 @@ import {
   Pie,
   Cell,
   AreaChart,
-  Area
+  Area,
 } from "recharts";
 import {
   Download,
@@ -20,7 +20,7 @@ import {
   Home,
   CreditCard,
   AlertCircle,
-  Activity
+  Activity,
 } from "lucide-react";
 
 // Import Layout & UI Components
@@ -64,6 +64,13 @@ export default function DashboardPage() {
   const [trendData, setTrendData] = useState([]);
   const [distributionData, setDistributionData] = useState([]);
   const [recentPayments, setRecentPayments] = useState([]);
+
+  const [demoData, setDemoData] = useState({
+    totalResidents: 0,
+    genderDistribution: [],
+    changesSummary: [],
+    recentChangesCount: 0,
+  });
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState({
     open: false,
@@ -78,13 +85,20 @@ export default function DashboardPage() {
         const token = localStorage.getItem("token");
         const headers = { Authorization: `Bearer ${token}` };
 
-        const [summaryRes, trendRes, distRes, payRes, invoicesRes] =
+        const [summaryRes, trendRes, distRes, payRes, invoicesRes, demoRes] =
           await Promise.all([
             fetch("http://localhost:3001/api/dashboard/summary", { headers }),
             fetch("http://localhost:3001/api/dashboard/trending", { headers }),
-            fetch("http://localhost:3001/api/dashboard/distribution", { headers}),
-            fetch("http://localhost:3001/api/dashboard/recent-payments", { headers }),
+            fetch("http://localhost:3001/api/dashboard/distribution", {
+              headers,
+            }),
+            fetch("http://localhost:3001/api/dashboard/recent-payments", {
+              headers,
+            }),
             fetch("http://localhost:3001/api/billing?pageSize=5", { headers }),
+            fetch("http://localhost:3001/api/dashboard/demographics", {
+              headers,
+            }),
           ]);
 
         const summaryData = await summaryRes.json();
@@ -92,6 +106,7 @@ export default function DashboardPage() {
         const distData = await distRes.json();
         const payData = await payRes.json();
         const invoicesData = await invoicesRes.json();
+        const demo = await demoRes.json();
 
         if (summaryRes.ok && summaryData.success) {
           setStats(summaryData.data);
@@ -120,6 +135,7 @@ export default function DashboardPage() {
           setRecentPayments(payData.data);
         }
 
+        if (demo.success) setDemoData(demo.data);
       } catch (error) {
         console.error("Dashboard Fetch Error:", error); // Helpful for debugging
         setToast({
@@ -239,6 +255,62 @@ export default function DashboardPage() {
                 </Card>
               </div>
 
+              <div className="grid gap-6 md:grid-cols-3 mt-6">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle >
+                      Tổng cư dân
+                    </CardTitle>
+                  </CardHeader>
+                  <CardValue>
+                    {demoData.totalResidents}
+                  </CardValue>
+                  <CardFooter>
+                    <p className="text-xs text-muted-foreground">
+                      Người dân đang sinh sống
+                    </p>
+                  </CardFooter>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle>
+                      Biến động mới
+                    </CardTitle>
+                  </CardHeader>
+                  <CardValue >
+                    +{demoData.recentChangesCount}
+                  </CardValue>
+                  <CardFooter>
+                    <p className="text-xs text-muted-foreground">
+                      Trong 30 ngày qua
+                    </p>
+                  </CardFooter>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle >
+                      Tạm vắng / Tạm trú
+                    </CardTitle>
+                  </CardHeader>
+                  <CardValue>
+                    {demoData.changesSummary.find(
+                      (c) => c.change_type === "absence",
+                    )?.count || 0}{" "}
+                    /{" "}
+                    {demoData.changesSummary.find(
+                      (c) => c.change_type === "temporary_residence",
+                    )?.count || 0}
+                  </CardValue>
+                  <CardFooter>
+                    <p className=" text-xs text-muted-foreground">
+                      Số lượng hồ sơ hiện tại
+                    </p>
+                  </CardFooter>
+                </Card>
+              </div>
+
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
                 {/* 1. MAIN REVENUE TREND (Bar Chart) - Occupies 4/7 cols */}
                 <Card className="col-span-4">
@@ -279,7 +351,11 @@ export default function DashboardPage() {
                           align="right"
                           iconType="circle"
                           iconSize={6}
-                          formatter={(value) => <span className="text-xs text-muted-foreground">{value}</span>}
+                          formatter={(value) => (
+                            <span className="text-xs text-muted-foreground">
+                              {value}
+                            </span>
+                          )}
                         />
                         <Bar
                           dataKey="total"
@@ -373,53 +449,88 @@ export default function DashboardPage() {
                 </Card>
 
                 {/* 4. PERFORMANCE RADIAL (Collection Efficiency) - 3/7 cols */}
-                <Card className="col-span-3">
-                  <CardHeader>
-                    <CardTitle>Hiệu suất thu nợ</CardTitle>
-                  </CardHeader>
-                  <div className="h-[250px] flex flex-col items-center justify-center">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={trendData}>
-                        <defs>
-                          <linearGradient
-                            id="colorRate"
-                            x1="0"
-                            y1="0"
-                            x2="0"
-                            y2="1"
-                          >
-                            <stop
-                              offset="5%"
-                              stopColor="#3b82f6"
-                              stopOpacity={0.3}
-                            />
-                            <stop
-                              offset="95%"
-                              stopColor="#3b82f6"
-                              stopOpacity={0}
-                            />
-                          </linearGradient>
-                        </defs>
-                        <Area
-                          type="monotone"
-                          dataKey="collected"
-                          stroke="#3b82f6"
-                          fillOpacity={1}
-                          fill="url(#colorRate)"
-                        />
-                        <Tooltip />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                    <div className="text-center mt-2">
-                      <p className="text-2xl font-bold">
-                        {stats.collectionRate}%
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Tỷ lệ hoàn thành mục tiêu
-                      </p>
+                <div className="col-span-3 space-y-6 flex flex-col">
+                  <Card className="flex-1">
+                    <CardHeader>
+                      <CardTitle>Hiệu suất thu nợ</CardTitle>
+                    </CardHeader>
+                    <div className="h-[250px] flex flex-col items-center justify-center">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={trendData}>
+                          <defs>
+                            <linearGradient
+                              id="colorRate"
+                              x1="0"
+                              y1="0"
+                              x2="0"
+                              y2="1"
+                            >
+                              <stop
+                                offset="5%"
+                                stopColor="#3b82f6"
+                                stopOpacity={0.3}
+                              />
+                              <stop
+                                offset="95%"
+                                stopColor="#3b82f6"
+                                stopOpacity={0}
+                              />
+                            </linearGradient>
+                          </defs>
+                          <Area
+                            type="monotone"
+                            dataKey="collected"
+                            stroke="#3b82f6"
+                            fillOpacity={1}
+                            fill="url(#colorRate)"
+                          />
+                          <Tooltip />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                      <div className="text-center mt-2">
+                        <p className="text-2xl font-bold">
+                          {stats.collectionRate}%
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Tỷ lệ hoàn thành mục tiêu
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                </Card>
+                  </Card>
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-semibold">
+                        Cơ cấu giới tính
+                      </CardTitle>
+                    </CardHeader>
+                    <div className="px-6 pb-4">
+                      <div className="flex justify-between items-end mb-2">
+                        <span className="text-xs text-muted-foreground">
+                          Nam / Nữ
+                        </span>
+                        <span className="text-xs font-bold">
+                          {demoData.genderDistribution.find(
+                            (g) => g.gender === "Male",
+                          )?.count || 0}{" "}
+                          :{" "}
+                          {demoData.genderDistribution.find(
+                            (g) => g.gender === "Female",
+                          )?.count || 0}
+                        </span>
+                      </div>
+                      <div className="w-full bg-muted rounded-full h-2 flex overflow-hidden">
+                        <div
+                          className="bg-blue-600 h-full"
+                          style={{ width: "48%" }}
+                        ></div>{" "}
+                        <div
+                          className="bg-blue-400 h-full"
+                          style={{ width: "52%" }}
+                        ></div>
+                      </div>
+                    </div>
+                  </Card>
+                </div>
               </div>
 
               <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
