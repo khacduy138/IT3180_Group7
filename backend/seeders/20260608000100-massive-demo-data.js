@@ -184,7 +184,5 @@ module.exports = {
       throw error;
     }
   },
-  async down(queryInterface) {
-    // Logic xóa ngược lại
-  }
+  
 };

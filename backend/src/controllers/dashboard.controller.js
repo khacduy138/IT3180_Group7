@@ -1,7 +1,7 @@
-const { Op, fn, col, literal } = require('sequelize');
+const { Op, fn, col } = require('sequelize');
 const { 
   Invoice, Household, Resident, FeePeriod, 
-  Payment, InvoiceItem, FeeType, sequelize 
+  Payment, InvoiceItem, FeeType 
 } = require('../models');
 
 const getSummary = async (req, res) => {
