@@ -18,5 +18,7 @@ router.get('/search', dashboardController.globalSearch);
 router.get('/export-filters', authorize({ roles: ['admin', 'accountant'] }), dashboardController.getExportFilters);
 router.post('/export', authorize({ roles: ['admin', 'accountant'] }), dashboardController.exportData);
 
+router.get('/invoices-table', authorize({ roles: ['admin', 'accountant', 'staff'] }), dashboardController.getInvoicesTable);
+
 
 module.exports = router;

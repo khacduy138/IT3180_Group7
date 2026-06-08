@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   BarChart,
   Bar,
@@ -21,6 +21,7 @@ import {
   CreditCard,
   AlertCircle,
   Activity,
+  Filter,
 } from "lucide-react";
 
 // Import Layout & UI Components
@@ -77,10 +78,67 @@ export default function DashboardPage() {
     revenueGrowth: 0,
     occupancyRate: 0,
   });
-  const [recentInvoices, setRecentInvoices] = useState([]);
   const [trendData, setTrendData] = useState([]);
   const [distributionData, setDistributionData] = useState([]);
   const [recentPayments, setRecentPayments] = useState([]);
+
+  const [tableData, setTableData] = useState([]);
+  const [tablePagination, setTablePagination] = useState({
+    total: 0,
+    currentPage: 1,
+    totalPages: 1,
+  });
+  const [tableFilters, setTableFilters] = useState({
+    q: "",
+    status: "all",
+    startDate: "",
+    endDate: "",
+    page: 1,
+  });
+  const [isTableLoading, setIsTableLoading] = useState(false);
+
+  const fetchTableData = useCallback(async () => {
+  setIsTableLoading(true);
+  try {
+    const token = localStorage.getItem("token");
+    const params = new URLSearchParams({
+      q: tableFilters.q,
+      status: tableFilters.status,
+      startDate: tableFilters.startDate,
+      endDate: tableFilters.endDate,
+      page: tableFilters.page,
+      limit: 10,
+    });
+    
+    const res = await fetch(
+      `http://localhost:3001/api/dashboard/invoices-table?${params}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    
+    // Kiểm tra xem res có phải là JSON không để tránh lỗi Syntax Error khi gặp HTML 404
+    if (!res.ok) {
+      console.error("Lỗi HTTP:", res.status);
+    }
+
+    const result = await res.json();
+    
+    if (result.success) {
+      setTableData(result.data);
+      setTablePagination(result.pagination);
+    } else {
+      // In ra lỗi từ Backend
+      console.error("Lỗi từ backend:", result.message);
+    }
+  } catch (error) {
+    console.error("Lỗi sập mạng hoặc parse JSON:", error);
+  } finally {
+    setIsTableLoading(false);
+  }
+}, [tableFilters]);
+
+  useEffect(() => {
+    fetchTableData();
+  }, [fetchTableData]);
 
   const [demoData, setDemoData] = useState({
     totalResidents: 0,
@@ -131,7 +189,7 @@ export default function DashboardPage() {
         const token = localStorage.getItem("token");
         const headers = { Authorization: `Bearer ${token}` };
 
-        const [summaryRes, trendRes, distRes, payRes, invoicesRes, demoRes] =
+        const [summaryRes, trendRes, distRes, payRes, demoRes] =
           await Promise.all([
             fetch("http://localhost:3001/api/dashboard/summary", { headers }),
             fetch("http://localhost:3001/api/dashboard/trending", { headers }),
@@ -141,7 +199,6 @@ export default function DashboardPage() {
             fetch("http://localhost:3001/api/dashboard/recent-payments", {
               headers,
             }),
-            fetch("http://localhost:3001/api/billing?pageSize=5", { headers }),
             fetch("http://localhost:3001/api/dashboard/demographics", {
               headers,
             }),
@@ -151,7 +208,6 @@ export default function DashboardPage() {
         const trendDataRes = await trendRes.json();
         const distData = await distRes.json();
         const payData = await payRes.json();
-        const invoicesData = await invoicesRes.json();
         const demo = await demoRes.json();
 
         if (summaryRes.ok && summaryData.success) {
@@ -163,10 +219,6 @@ export default function DashboardPage() {
             title: "Lỗi",
             description: "Không thể tải dữ liệu thống kê",
           });
-        }
-
-        if (invoicesRes.ok) {
-          setRecentInvoices(invoicesData.data || []);
         }
 
         if (trendRes.ok && trendDataRes.success) {
@@ -535,11 +587,11 @@ export default function DashboardPage() {
                 {/* 3. RECENT ACTIVITY (Live Feed) - Occupies 4/7 cols */}
                 <Card className="col-span-4">
                   <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Activity size={18} /> Giao dịch gần đây
+                    <CardTitle className="flex items-center pl-2">
+                      Giao dịch gần đây
                     </CardTitle>
                   </CardHeader>
-                  <div className="px-4 pb-4">
+                  <div className="px-4 py-4">
                     <div className="space-y-4">
                       {recentPayments.map((payment) => (
                         <div
@@ -653,67 +705,176 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-xl font-semibold">
-                    Tình trạng thu phí gần đây
+              <div className="rounded-xl border border-border bg-card p-6 shadow-sm space-y-6">
+                <div className="items-center justify-between gap-4">
+                  <h2 className="text-xl font-semibold mb-4">
+                    Tình trạng thu phí hệ thống
                   </h2>
-                  <Button variant="link" size="sm">
-                    Xem tất cả
-                  </Button>
+                  <div className="flex flex-wrap justify-between items-center gap-3">
+                    <div className=""> 
+                    <Input
+                      placeholder="tìm phòng, mã hđ..."
+                      className="w-48 h-9"
+                      value={tableFilters.q}
+                      onChange={(e) =>
+                        setTableFilters({ ...tableFilters, q: e.target.value })
+                      }
+                      onKeyDown={(e) => e.key === "Enter" && fetchTableData()}
+                    />
+                    </div>
+                    <div className="flex items-center gap-2">
+                    <Select
+                      variant="outline"
+                      size="sm"
+                      value={tableFilters.status}
+                      onValueChange={(val) =>
+                        setTableFilters({
+                          ...tableFilters,
+                          status: val,
+                          page: 1,
+                        })
+                      }
+                      options={[
+                        { value: "all", label: "tất cả trạng thái" },
+                        { value: "PAID", label: "đã nộp" },
+                        { value: "PENDING", label: "chưa nộp" },
+                        { value: "PARTIAL", label: "nộp một phần" },
+                      ]}
+                      className="w-40 h-9"
+                    />
+                    <div className="flex items-center gap-2 px-3 py-1 ">
+                      <input
+                        type="date"
+                        className="bg-transparent text-xs outline-none"
+                        value={tableFilters.startDate}
+                        onChange={(e) =>
+                          setTableFilters({
+                            ...tableFilters,
+                            startDate: e.target.value,
+                            page: 1,
+                          })
+                        }
+                      />
+                      <span className="text-muted-foreground">→</span>
+                      <input
+                        type="date"
+                        className="bg-transparent text-xs outline-none"
+                        value={tableFilters.endDate}
+                        onChange={(e) =>
+                          setTableFilters({
+                            ...tableFilters,
+                            endDate: e.target.value,
+                            page: 1,
+                          })
+                        }
+                      />
+                    </div>
+                    <Button
+                      variant="icon"
+                      size="sm"
+                      onClick={fetchTableData}
+                    >
+                      <Filter size={16} /> 
+                    </Button>
+                  </div>
+                  </div>
                 </div>
 
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Số hóa đơn</TableHead>
-                      <TableHead>Mã hộ</TableHead>
-                      <TableHead>Kỳ thu</TableHead>
-                      <TableHead>Số tiền</TableHead>
-                      <TableHead>Trạng thái</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {recentInvoices.length === 0 ? (
+                <div className="relative">
+                  {isTableLoading && (
+                    <div className="absolute inset-0 bg-background/50 z-10 flex items-center justify-center">
+                      <Spinner size="md" />
+                    </div>
+                  )}
+                  <Table>
+                    <TableHeader>
                       <TableRow>
-                        <TableCell
-                          colSpan={5}
-                          className="text-center text-muted-foreground py-8"
-                        >
-                          Chưa có dữ liệu hóa đơn
-                        </TableCell>
+                        <TableHead>số hóa đơn</TableHead>
+                        <TableHead>mã hộ</TableHead>
+                        <TableHead>kỳ thu</TableHead>
+                        <TableHead>số tiền</TableHead>
+                        <TableHead>trạng thái</TableHead>
                       </TableRow>
-                    ) : (
-                      recentInvoices.map((invoice) => {
-                        const statusInfo = STATUS_MAP[invoice.status] || {
-                          label: invoice.status,
-                          color: "gray",
-                        };
-                        return (
-                          <TableRow key={invoice.id}>
-                            <TableCell className="font-medium">
-                              {invoice.invoice_number}
-                            </TableCell>
-                            <TableCell>
-                              {invoice.household?.room_number ?? "-"}
-                            </TableCell>
-                            <TableCell>
-                              {invoice.fee_period?.name ?? "-"}
-                            </TableCell>
-                            <TableCell>
-                              {formatCurrency(invoice.total_amount)}
-                            </TableCell>
-                            <TableCell>
-                              <Tag color={statusInfo.color}>
-                                {statusInfo.label}
-                              </Tag>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })
-                    )}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {tableData.length === 0 ? (
+                        <TableRow>
+                          <TableCell
+                            colSpan={5}
+                            className="text-center text-muted-foreground py-8"
+                          >
+                            chưa có dữ liệu hóa đơn
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        tableData.map((invoice) => {
+                          const statusInfo = STATUS_MAP[invoice.status] || {
+                            label: invoice.status,
+                            color: "gray",
+                          };
+                          const room = invoice.household?.room_number || "-";
+                          return (
+                            <TableRow key={invoice.id}>
+                              <TableCell className="font-medium text-xs">
+                                {invoice.invoice_number}
+                              </TableCell>
+                              <TableCell className="font-bold">
+                                {room}
+                              </TableCell>
+                              <TableCell>{invoice.fee_period?.name}</TableCell>
+                              <TableCell>
+                                {formatCurrency(invoice.total_amount)}
+                              </TableCell>
+                              <TableCell>
+                                <Tag color={statusInfo.color}>
+                                  {statusInfo.label}
+                                </Tag>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                <div className="flex items-center justify-between pt-4 border-t border-border">
+                  <p className="text-xs text-muted-foreground">
+                    hiển thị trang {tablePagination.currentPage} trên tổng số{" "}
+                    {tablePagination.totalPages} ({tablePagination.total} kết
+                    quả)
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={tableFilters.page === 1}
+                      onClick={() =>
+                        setTableFilters({
+                          ...tableFilters,
+                          page: tableFilters.page - 1,
+                        })
+                      }
+                    >
+                      trước
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={
+                        tableFilters.page === tablePagination.totalPages
+                      }
+                      onClick={() =>
+                        setTableFilters({
+                          ...tableFilters,
+                          page: tableFilters.page + 1,
+                        })
+                      }
+                    >
+                      sau
+                    </Button>
+                  </div>
+                </div>
               </div>
             </div>
           )}

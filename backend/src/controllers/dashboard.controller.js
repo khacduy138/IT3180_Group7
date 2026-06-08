@@ -320,7 +320,7 @@ const getExportFilters = async (req, res) => {
 
 const exportData = async (req, res) => {
   try {
-    const { timeFrame, customDate, format, activeTab, config } = req.body;
+    const { timeFrame, customDate, activeTab, config } = req.body;
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('báo cáo');
 
@@ -392,14 +392,59 @@ const exportData = async (req, res) => {
   }
 };
 
+const getInvoicesTable = async (req, res) => {
+  try {
+    const { q, status, startDate, endDate, page = 1, limit = 10 } = req.query;
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+
+    const where = {};
+    if (status && status !== 'all') where.status = status;
+    
+    if (q) {
+      where[Op.or] = [
+        { invoice_number: { [Op.like]: `%${q}%` } },
+        { '$household.room_number$': { [Op.like]: `%${q}%` } }
+      ];
+    }
+
+    if (startDate && endDate) {
+      where.created_at = { [Op.between]: [new Date(startDate + " 00:00:00"), new Date(endDate + " 23:59:59")] };
+    }
+
+    const { rows, count } = await Invoice.findAndCountAll({
+      where,
+      include: [
+        { model: Household, as: 'household', attributes: ['room_number'] },
+        { model: FeePeriod, as: 'fee_period', attributes: ['name'] }
+      ],
+      order: [['created_at', 'DESC']],
+      limit: parseInt(limit),
+      offset: offset
+    });
+
+    return res.json({
+      success: true,
+      data: rows,
+      pagination: {
+        total: count,
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(count / limit)
+      }
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   getSummary,
-  getReportByPeriod,
-  globalSearch,
   getTrending,
   getFeeDistribution,
   getRecentPayments,
+  getReportByPeriod,
+  globalSearch,
   getDemographicStats,
   getExportFilters,
-  exportData
+  exportData,
+  getInvoicesTable
 };
