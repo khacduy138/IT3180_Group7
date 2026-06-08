@@ -40,6 +40,46 @@ const getSummary = async (req, res) => {
       where: { status: { [Op.ne]: 'PAID' } }
     });
 
+    const occupiedHouseholds = await Household.count({
+      where: { 
+        status: 'active', 
+        deleted_at: null 
+      }
+    });
+
+    const occupancyRate = totalHouseholds > 0 
+      ? ((occupiedHouseholds / totalHouseholds) * 100).toFixed(2) 
+      : 0;
+    
+    const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    
+    const startOfPreviousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const endOfPreviousMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+
+    const currentMonthRevenue = await Payment.sum('amount', {
+      where: {
+        payment_date: {
+          [Op.gte]: startOfCurrentMonth,
+        }
+      }
+    }) || 0;
+
+    const previousMonthRevenue = await Payment.sum('amount', {
+      where: {
+        payment_date: {
+          [Op.gte]: startOfPreviousMonth,
+          [Op.lte]: endOfPreviousMonth
+        }
+      }
+    }) || 0;
+
+    let revenueGrowth = 0;
+    if (previousMonthRevenue > 0) {
+      revenueGrowth = (((currentMonthRevenue - previousMonthRevenue) / previousMonthRevenue) * 100).toFixed(2);
+    } else if (currentMonthRevenue > 0) {
+      revenueGrowth = 100;
+    }
+
     return res.json({
       success: true,
       data: {
@@ -47,7 +87,9 @@ const getSummary = async (req, res) => {
         collectionRate,
         householdsWithDebt,
         totalHouseholds,
-        targetAmount: totalTarget
+        targetAmount: totalTarget,
+        revenueGrowth,
+        occupancyRate
       }
     });
   } catch (error) {
