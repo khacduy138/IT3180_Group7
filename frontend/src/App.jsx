@@ -9,6 +9,9 @@ import PaymentHistoryPage from './pages/billing/PaymentHistoryPage';
 import PaymentPage from './pages/billing/PaymentPage';
 import HouseholdDetailPage from './pages/households/HouseholdDetailPage';
 import HouseholdsListPage from './pages/households/HouseholdsListPage';
+import FeeListPage from './pages/fees/FeeListPage';
+import FeePeriodForm from './pages/fees/FeePeriodForm';
+import UtilityInvoiceForm from './pages/fees/UtilityInvoiceForm';
 
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem('token');
@@ -95,6 +98,30 @@ function App() {
           element={
             <ProtectedRoute>
               <HouseholdDetailPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/fees"
+          element={
+            <ProtectedRoute>
+              <FeeListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/fees/new"
+          element={
+            <ProtectedRoute>
+              <FeePeriodForm />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/fees/utility-invoices/new"
+          element={
+            <ProtectedRoute>
+              <UtilityInvoiceForm />
             </ProtectedRoute>
           }
         />
