@@ -80,7 +80,7 @@ export default function SmartSearch({
 
   return (
     <div className={cn("relative w-full", className)} ref={searchRef}>
-      <div className="flex gap-2 items-center bg-card p-2 rounded-2xl border border-border shadow-sm focus-within:ring-2 focus-within:ring-primary/20 transition-all">
+      <div className="flex gap-2 items-center bg-card p-2 rounded-lg border border-border shadow-sm focus-within:ring-2 focus-within:ring-primary/20 transition-all">
         {/* 1. Lọc Loại dữ liệu */}
         <Select
           variant="subtle"
@@ -147,7 +147,7 @@ export default function SmartSearch({
 
       {/* --- DROPDOWN KẾT QUẢ --- */}
       {isOpen && results && (
-        <div className="absolute top-full left-0 right-0 z-50 mt-2 bg-background border border-border rounded-2xl shadow-2xl overflow-hidden">
+        <div className="absolute top-full left-0 right-0 z-50 mt-2 bg-background border border-border rounded-xl shadow-2xl overflow-hidden">
           <div className="max-h-[400px] overflow-y-auto p-2">
             {/* 1. Kiểm tra xem có dữ liệu bất kỳ không */}
             {( (results.households?.length || 0) + 

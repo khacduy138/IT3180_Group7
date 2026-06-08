@@ -52,6 +52,9 @@ import {
 } from "../../components/ui/Table";
 import { Tag } from "../../components/ui/Tag";
 import { Toast } from "../../components/ui/Toast";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "../../components/ui/Tabs";
+import { Select } from "../../components/ui/Select";
+import { Input } from "../../components/ui/Input";
 
 const STATUS_MAP = {
   PAID: { label: "Đã nộp", color: "green" },
@@ -94,6 +97,20 @@ export default function DashboardPage() {
     setSelectedItem({ type, data });
     setIsDetailModalOpen(true);
   };
+
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+const [exportConfig, setExportConfig] = useState({
+  timeFrame: "1",
+  customDate: { start: "", end: "" },
+  format: "excel",
+  people: { columns: ["name", "cccd"], filters: { household: "all" } },
+  household: { columns: ["room", "area"], filters: { floor: "all" } },
+  invoice: { columns: ["id", "amount", "status"], filters: { household: "all", type: "all" } }
+});
+
+const handleExport = () => {
+  setIsExportModalOpen(true);
+};
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -216,7 +233,7 @@ export default function DashboardPage() {
                     Chào mừng quay trở lại, Admin.
                   </p>
                 </div>
-                <Button variant="outline" className="gap-2">
+                <Button variant="default" className="gap-2" onClick={handleExport}>
                   <Download size={18} /> Export report
                 </Button>
               </div>
@@ -833,6 +850,143 @@ export default function DashboardPage() {
           </Button>
         </ModalFooter>
       </Modal>
+
+      <Modal open={isExportModalOpen} onOpenChange={setIsExportModalOpen}>
+  <ModalHeader>Cấu hình xuất dữ liệu</ModalHeader>
+  <ModalBody className="space-y-6">
+    <div className="space-y-3">
+      <p className="text-sm font-medium text-foreground">Phạm vi thời gian</p>
+      <Select
+        value={exportConfig.timeFrame}
+        onValueChange={(val) => setExportConfig({ ...exportConfig, timeFrame: val })}
+        options={[
+          { value: "1", label: "Trong 1 tháng gần nhất" },
+          { value: "3", label: "Trong 3 tháng gần nhất" },
+          { value: "6", label: "Trong 6 tháng gần nhất" },
+          { value: "custom", label: "Tùy chọn khoảng thời gian" }
+        ]}
+        className="w-full"
+      />
+      {exportConfig.timeFrame === "custom" && (
+        <div className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg border border-border">
+          <Input 
+            type="date" 
+            value={exportConfig.customDate.start}
+            onChange={(e) => setExportConfig({...exportConfig, customDate: {...exportConfig.customDate, start: e.target.value}})}
+            className="bg-transparent border-none h-8" 
+          />
+          <span className="text-muted-foreground">→</span>
+          <Input 
+            type="date" 
+            value={exportConfig.customDate.end}
+            onChange={(e) => setExportConfig({...exportConfig, customDate: {...exportConfig.customDate, end: e.target.value}})}
+            className="bg-transparent border-none h-8" 
+          />
+        </div>
+      )}
+    </div>
+
+    <Tabs defaultValue="people" className="w-full">
+      <TabsList className="w-full justify-start border-b border-border rounded-none bg-transparent h-auto p-0 mb-4">
+        <TabsTrigger value="people" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2">Người dân</TabsTrigger>
+        <TabsTrigger value="household" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2">Hộ gia đình</TabsTrigger>
+        <TabsTrigger value="invoice" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2">Hóa đơn</TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="people" className="space-y-4">
+        <div className="grid grid-cols-2 gap-3">
+          {["Họ tên", "Căn cước công dân", "Số điện thoại", "Giới tính", "Ngày sinh"].map((col) => (
+            <label key={col} className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
+              <input type="checkbox" defaultChecked className="accent-primary h-4 w-4" />
+              {col}
+            </label>
+          ))}
+        </div>
+        <div className="pt-4 border-t border-border">
+          <p className="text-xs font-bold text-muted-foreground uppercase mb-2">Bộ lọc nâng cao</p>
+          <Select
+            placeholder="Lọc theo hộ gia đình"
+            options={[{ value: "all", label: "Tất cả hộ gia đình" }, { value: "p101", label: "Phòng P101" }]}
+            className="w-full"
+          />
+        </div>
+      </TabsContent>
+
+      <TabsContent value="household" className="space-y-4">
+        <div className="grid grid-cols-2 gap-3">
+          {["Số phòng", "Diện tích", "Trạng thái", "Tầng", "Số nhân khẩu"].map((col) => (
+            <label key={col} className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
+              <input type="checkbox" defaultChecked className="accent-primary h-4 w-4" />
+              {col}
+            </label>
+          ))}
+        </div>
+        <div className="pt-4 border-t border-border">
+          <p className="text-xs font-bold text-muted-foreground uppercase mb-2">Bộ lọc nâng cao</p>
+          <Select
+            placeholder="Lọc theo tầng"
+            options={[{ value: "all", label: "Tất cả các tầng" }, { value: "1", label: "Tầng 1" }]}
+            className="w-full"
+          />
+        </div>
+      </TabsContent>
+
+      <TabsContent value="invoice" className="space-y-4">
+        <div className="grid grid-cols-2 gap-3">
+          {["Mã hóa đơn", "Kỳ thu", "Tổng tiền", "Đã nộp", "Còn nợ", "Trạng thái"].map((col) => (
+            <label key={col} className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
+              <input type="checkbox" defaultChecked className="accent-primary h-4 w-4" />
+              {col}
+            </label>
+          ))}
+        </div>
+        <div className="grid grid-cols-2 gap-2 pt-4 border-t border-border">
+          <div className="col-span-2 text-xs font-bold text-muted-foreground uppercase mb-1">Bộ lọc nâng cao</div>
+          <Select
+            placeholder="Theo phòng"
+            options={[{ value: "all", label: "Tất cả phòng" }]}
+          />
+          <Select
+            placeholder="Theo loại phí"
+            options={[{ value: "all", label: "Tất cả loại phí" }]}
+          />
+        </div>
+      </TabsContent>
+    </Tabs>
+
+    <div className="pt-4 border-t border-border space-y-3">
+      <p className="text-sm font-medium text-foreground">Định dạng tập tin</p>
+      <div className="flex gap-4">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input 
+            type="radio" 
+            name="format" 
+            value="excel" 
+            checked={exportConfig.format === "excel"}
+            onChange={(e) => setExportConfig({...exportConfig, format: e.target.value})}
+            className="accent-primary h-4 w-4" 
+          />
+          <span className="text-sm text-foreground">Microsoft excel (.xlsx)</span>
+        </label>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input 
+            type="radio" 
+            name="format" 
+            value="pdf" 
+            checked={exportConfig.format === "pdf"}
+            onChange={(e) => setExportConfig({...exportConfig, format: e.target.value})}
+            className="accent-primary h-4 w-4" 
+          />
+          <span className="text-sm text-foreground">Portable document (.pdf)</span>
+        </label>
+      </div>
+    </div>
+  </ModalBody>
+  <ModalFooter>
+    <Button variant="outline" onClick={() => setIsExportModalOpen(false)}>Đóng</Button>
+    <Button variant="default" onClick={() => setIsExportModalOpen(false)}>Bắt đầu xuất dữ liệu</Button>
+  </ModalFooter>
+</Modal>
     </div>
   );
 }
