@@ -59,6 +59,8 @@ export default function DashboardPage() {
     collectionRate: 0,
     householdsWithDebt: 0,
     totalHouseholds: 0,
+    revenueGrowth: 0,
+    occupancyRate: 0,
   });
   const [recentInvoices, setRecentInvoices] = useState([]);
   const [trendData, setTrendData] = useState([]);
@@ -159,6 +161,12 @@ export default function DashboardPage() {
       currency: "VND",
     }).format(val);
 
+  const maleCount = demoData.genderDistribution.find((g) => g.gender === "Male")?.count || 0;
+  const femaleCount = demoData.genderDistribution.find((g) => g.gender === "Female")?.count || 0;
+  const totalGender = maleCount + femaleCount || 1;
+  const malePercent = Math.round((maleCount / totalGender) * 100);
+  const femalePercent = 100 - malePercent; 
+
   return (
     <div className="min-h-screen bg-background">
       <TopBar
@@ -206,8 +214,8 @@ export default function DashboardPage() {
                   </CardHeader>
                   <CardValue>{formatCurrency(stats.totalCollected)}</CardValue>
                   <CardFooter>
-                    <p className="text-xs text-green-500 font-medium">
-                      ↑ 12% so với tháng trước
+                    <p className={`text-xs font-medium ${stats.revenueGrowth >= 0 ? "text-green-500" : "text-red-500"}`}>
+                        {stats.revenueGrowth >= 0 ? "↑" : "↓"} {Math.abs(stats.revenueGrowth)}% so với tháng trước
                     </p>
                   </CardFooter>
                 </Card>
@@ -249,7 +257,7 @@ export default function DashboardPage() {
                   <CardValue>{stats.totalHouseholds}</CardValue>
                   <CardFooter>
                     <p className="text-xs text-muted-foreground">
-                      98% đang có người ở
+                        {stats.occupancyRate}% đang có người ở
                     </p>
                   </CardFooter>
                 </Card>
@@ -520,14 +528,14 @@ export default function DashboardPage() {
                       </div>
                       <div className="w-full bg-muted rounded-full h-2 flex overflow-hidden">
                         <div
-                          className="bg-blue-600 h-full"
-                          style={{ width: "48%" }}
-                        ></div>{" "}
-                        <div
-                          className="bg-blue-400 h-full"
-                          style={{ width: "52%" }}
+                            className="bg-blue-600 h-full transition-all duration-500"
+                            style={{ width: `${malePercent}%` }}
                         ></div>
-                      </div>
+                        <div
+                            className="bg-blue-400 h-full transition-all duration-500"
+                            style={{ width: `${femalePercent}%` }}
+                        ></div>
+                        </div>
                     </div>
                   </Card>
                 </div>
