@@ -7,6 +7,7 @@ import {
   Home,
   Wallet,
   History,
+  CalendarDays,
 } from "lucide-react";
 
 export const TOP_BAR_ITEMS = [
@@ -47,9 +48,15 @@ export const TOP_BAR_ITEMS = [
     allowedRoles: ["admin", "manager", "accountant"],
   },
   {
-    label: "Fees",
-    path: "/fees",
+    label: "Loại phí",
+    path: "/fees/types",
     icon: Banknote,
+    allowedRoles: ["admin"],
+  },
+  {
+    label: "Đợt thu phí",
+    path: "/fees/periods",
+    icon: CalendarDays,
     allowedRoles: ["admin"],
   },
   {
