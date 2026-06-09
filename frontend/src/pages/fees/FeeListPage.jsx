@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, RefreshCw, Zap } from 'lucide-react';
+import { Plus, RefreshCw, Zap, Filter } from 'lucide-react';
 
 import TopBar from '../../components/ui/TopBar';
 import Sidebar from '../../components/ui/Sidebar';
@@ -102,20 +102,39 @@ export default function FeeListPage() {
               </div>
             </div>
 
-            <Card className="flex flex-wrap items-end gap-4">
-              <label className="min-w-56 space-y-2 text-sm font-medium">
-                <span>Trạng thái</span>
-                <Select
-                  value={status}
-                  onValueChange={setStatus}
-                  options={STATUS_OPTIONS}
-                  className="w-full"
-                />
-              </label>
-              <Button type="button" variant="outline" onClick={() => setReloadKey((k) => k + 1)}>
-                <RefreshCw className="h-4 w-4" /> Làm mới
-              </Button>
-            </Card>
+            <div className="flex gap-2 items-center bg-card p-1.5 rounded-2xl border border-border shadow-sm transition-all w-fit max-w-2xl">
+  <Select
+    variant="subtle"
+    size="sm"
+    value={status}
+    onValueChange={setStatus}
+    options={STATUS_OPTIONS}
+    className="h-9 rounded-xl bg-muted/50 border-none font-medium min-w-[160px]"
+  />
+
+
+  <Button
+    variant="icon"
+    className="rounded-xl h-10 w-12 p-0 flex shrink-0"
+    onClick={() => setReloadKey((prev) => prev + 1)}
+  >
+    <Filter size={18} />
+  </Button>
+
+  <div className="h-6 w-px bg-border" />
+
+  <Button
+    variant="outline"
+    className="rounded-xl h-10 px-4 flex gap-2 shrink-0 border-none hover:bg-muted font-medium text-sm text-muted-foreground"
+    onClick={() => {
+      setStatus("all");
+      setReloadKey((prev) => prev + 1);
+    }}
+  >
+    <RefreshCw size={16} />
+    làm mới
+  </Button>
+</div>
 
             <Card className="p-0">
               {loading ? (
