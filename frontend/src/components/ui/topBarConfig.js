@@ -1,18 +1,16 @@
 import {
   LayoutDashboard,
-  Settings,
   BookUser,
   Banknote,
   Receipt,
   Home,
   Wallet,
   History,
-  FileBarChart,
 } from "lucide-react";
 
 export const TOP_BAR_ITEMS = [
   {
-    label: "Users",
+    label: "Người dùng",
     path: "/users",
     icon: BookUser,
     allowedRoles: ["admin", "manager"],
@@ -30,13 +28,13 @@ export const TOP_BAR_ITEMS = [
     allowedRoles: ["admin", "manager", "customer"],
   },
   {
-    label: "Bills",
+    label: "Hóa đơn",
     path: "/billing",
     icon: Receipt,
     allowedRoles: ["admin", "manager", "customer"],
   },
   {
-    label: "Payments",
+    label: "Thanh toán",
     path: "/payments",
     icon: Wallet,
     allowedRoles: ["admin", "manager", "accountant"],
@@ -52,17 +50,5 @@ export const TOP_BAR_ITEMS = [
     path: "/fees",
     icon: Banknote,
     allowedRoles: ["admin", "manager", "accountant"],
-  },
-  {
-    label: "Báo cáo",
-    path: "/reports",
-    icon: FileBarChart,
-    allowedRoles: ["admin", "manager", "customer"],
-  },
-  {
-    label: "Settings",
-    path: "/settings",
-    icon: Settings,
-    allowedRoles: ["admin", "manager", "customer"],
-  },
+  }
 ];
