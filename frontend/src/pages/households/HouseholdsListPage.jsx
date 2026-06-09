@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { RefreshCw, Plus, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { RefreshCw, Plus, Search, ChevronLeft, ChevronRight, X } from 'lucide-react';
 
 import TopBar from '../../components/ui/TopBar';
 import Sidebar from '../../components/ui/Sidebar';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
+import { Input } from '../../components/ui/Input';
 import { Spinner } from '../../components/ui/Spinner';
 import { Tag } from '../../components/ui/Tag';
 import { Toast } from '../../components/ui/Toast';
@@ -139,24 +140,56 @@ export default function HouseholdsListPage() {
               </Button>
             </div>
 
-            <Card className="flex flex-wrap items-end gap-4">
-              <form onSubmit={handleSearchSubmit} className="flex flex-1 items-center gap-2 min-w-56">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <input
-                    type="text"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Tìm theo số phòng..."
-                    className="h-10 w-full rounded-md border border-border bg-background pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-ring"
-                  />
-                </div>
-                <Button type="submit" variant="outline">Tìm</Button>
-              </form>
-              <Button type="button" variant="outline" onClick={() => { setSearch(''); setPageNumber(1); setReloadKey((k) => k + 1); }} className="gap-2">
-                <RefreshCw size={16} /> Làm mới
-              </Button>
-            </Card>
+            <div className="flex gap-2 items-center bg-card p-1.5 rounded-2xl border border-border shadow-sm transition-all w-full max-w-2xl">
+  <Input
+    placeholder="tìm theo số phòng..."
+    className="border-none bg-transparent focus-visible:ring-0 text-base h-10 w-full"
+    value={search}
+    onChange={(e) => setSearch(e.target.value)}
+    onKeyDown={(e) => e.key === "Enter" && handleSearchSubmit(e)}
+    rightIcon={
+      search.length > 0 && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 w-8 p-0 rounded-full"
+          onClick={() => {
+            setSearch("");
+            setPageNumber(1);
+            setReloadKey((k) => k + 1);
+          }}
+        >
+          <X size={16} />
+        </Button>
+      )
+    }
+  />
+
+  <div className="h-6 w-px bg-border" />
+
+  <Button
+    variant="icon"
+    className="rounded-xl h-10 w-12 p-0 flex shrink-0"
+    onClick={handleSearchSubmit}
+  >
+    <Search className="h-[16px] w-[16px]" />
+  </Button>
+
+  <div className="h-6 w-px bg-border" />
+
+  <Button
+    variant="outline"
+    className="rounded-xl h-10 px-4 flex gap-2 shrink-0 border-none hover:bg-muted font-medium text-sm"
+    onClick={() => {
+      setSearch("");
+      setPageNumber(1);
+      setReloadKey((k) => k + 1);
+    }}
+  >
+    <RefreshCw size={16} />
+    làm mới
+  </Button>
+</div>
 
             <Card className="p-0">
               {loading ? (

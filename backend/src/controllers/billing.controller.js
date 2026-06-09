@@ -529,33 +529,54 @@ const createPayment = async (req, res, next) => {
 
 const listPayments = async (req, res, next) => {
   try {
+    const { q, status, startDate, endDate } = req.query;
     const where = {};
+    const andConditions = [];
 
-    if (req.query.invoiceId !== undefined && req.query.invoiceId !== '') {
-      const invoiceId = Number(req.query.invoiceId);
+    if (status && status !== 'all') {
+      where.payment_method = status;
+    }
 
-      if (!Number.isFinite(invoiceId) || invoiceId <= 0) {
-        return sendError(res, 400, 'Invalid invoiceId', [
-          { field: 'invoiceId', code: 'VAL_002', message: 'invoiceId must be a positive number' },
-        ]);
-      }
+    if (startDate && endDate && startDate !== '' && endDate !== '') {
+      andConditions.push({
+        payment_date: {
+          [Op.between]: [new Date(startDate + " 00:00:00"), new Date(endDate + " 23:59:59")]
+        }
+      });
+    }
 
-      where.invoice_id = invoiceId;
+    if (q && q.trim() !== '') {
+      const searchTerm = `%${q.trim()}%`;
+      andConditions.push({
+        [Op.or]: [
+          { '$invoice.invoice_number$': { [Op.like]: searchTerm } },
+          { '$invoice.household.room_number$': { [Op.like]: searchTerm } }
+        ]
+      });
+    }
+
+    if (andConditions.length > 0) {
+      where[Op.and] = andConditions;
     }
 
     const payments = await Payment.findAll({
       where,
-      include: [
-        {
-          model: Invoice,
-          as: 'invoice',
-          include: [{ model: Household, as: 'household' }],
-        },
-      ],
-      order: [['payment_date', 'DESC'], ['created_at', 'DESC']],
+      include: [{
+        model: Invoice,
+        as: 'invoice',
+        include: [{
+          model: Household,
+          as: 'household',
+          attributes: ['room_number']
+        }]
+      }],
+      order: [['payment_date', 'DESC']]
     });
 
-    return sendSuccess(res, 200, 'Payments retrieved successfully', payments);
+    return res.status(200).json({
+      success: true,
+      data: payments
+    });
   } catch (error) {
     return next(error);
   }

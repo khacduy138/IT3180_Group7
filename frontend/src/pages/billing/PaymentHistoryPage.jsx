@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Calendar, X } from 'lucide-react';
 
 import TopBar from '../../components/ui/TopBar';
 import Sidebar from '../../components/ui/Sidebar';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
+import { Tag } from '../../components/ui/Tag';
 import { Spinner } from '../../components/ui/Spinner';
+import { Select } from '../../components/ui/Select';
 import {
   Table,
   TableBody,
@@ -33,76 +35,57 @@ const formatDateTime = (value) => {
   }).format(new Date(value));
 };
 
-const getHouseholdLabel = (payment) => {
-  const invoice = payment.invoice;
-  const room = invoice?.household?.room_number || invoice?.household_id;
-  const householdName = invoice?.household?.name;
-
-  if (!room && !householdName) {
-    return '-';
-  }
-
-  return householdName ? `${householdName} / ${room}` : room;
-};
-
 export default function PaymentHistoryPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [invoiceId, setInvoiceId] = useState('');
-  const [appliedInvoiceId, setAppliedInvoiceId] = useState('');
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
 
-  useEffect(() => {
-    const controller = new AbortController();
+  const [paymentStatus, setPaymentStatus] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
+  useEffect(() => {
     const fetchPayments = async () => {
       setLoading(true);
-      setError('');
-
-      const params = new URLSearchParams();
-      if (appliedInvoiceId.trim()) {
-        params.set('invoiceId', appliedInvoiceId.trim());
-      }
+      const params = new URLSearchParams({
+        q: debouncedQuery,
+        status: paymentStatus,
+        startDate: startDate,
+        endDate: endDate
+      });
 
       try {
-        const response = await fetch(
-          `http://localhost:3001/api/payments${params.toString() ? `?${params.toString()}` : ''}`,
-          {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem('token')}`,
-            },
-            signal: controller.signal,
-          }
-        );
+        const response = await fetch(`http://localhost:3001/api/billing/payments?${params.toString()}`, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        });
         const result = await response.json();
 
-        if (!response.ok) {
-          throw new Error(result.message || 'Unable to load payments');
-        }
-
-        setPayments(result.data || []);
-      } catch (requestError) {
-        if (requestError.name !== 'AbortError') {
+        if (response.ok) {
+          setPayments(result.data || []);
+        } else {
           setPayments([]);
-          setError(requestError.message || 'Unable to connect to the server');
         }
+      } catch (error) {
+        setPayments([]);
       } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false);
-        }
+        setLoading(false);
       }
     };
 
     fetchPayments();
-    return () => controller.abort();
-  }, [appliedInvoiceId, reloadKey]);
+  }, [debouncedQuery, paymentStatus, startDate, endDate, reloadKey]);
 
-  const applyFilter = (event) => {
-    event.preventDefault();
-    setAppliedInvoiceId(invoiceId);
-  };
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedQuery(searchQuery);
+    }, 400);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -121,82 +104,133 @@ export default function PaymentHistoryPage() {
         >
           <div className="mx-auto max-w-7xl space-y-6">
             <div>
-              <h1 className="text-3xl font-bold tracking-tight">Payment history</h1>
+              <h1 className="text-3xl font-bold tracking-tight">Lịch sử thanh toán</h1>
               <p className="mt-1 text-muted-foreground">
-                Review recorded payments by invoice.
+                Xem lịch sử các khoản thanh toán đã ghi nhận.
               </p>
             </div>
 
-            <Card>
-              <form className="flex flex-wrap items-end gap-4" onSubmit={applyFilter}>
-                <label className="min-w-56 space-y-2 text-sm font-medium">
-                  <span>Invoice ID</span>
-                  <Input
-                    type="number"
-                    min="1"
-                    value={invoiceId}
-                    onChange={(event) => setInvoiceId(event.target.value)}
-                    placeholder="All invoices"
-                  />
-                </label>
+            <div className="flex gap-2 items-center bg-card p-1.5 rounded-2xl border border-border shadow-sm transition-all w-full max-w-5xl">
+              <Select
+                variant="subtle"
+                size="sm"
+                value={paymentStatus}
+                onValueChange={setPaymentStatus}
+                options={[
+                  { value: "all", label: "tất cả trạng thái" },
+                  { value: "SUCCESS", label: "thành công" },
+                  { value: "FAILED", label: "thất bại" },
+                ]}
+                className="h-9 rounded-xl bg-muted/50 border-none font-medium min-w-[160px]"
+              />
 
-                <Button type="submit">Apply filter</Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setReloadKey((current) => current + 1)}
-                >
-                  <RefreshCw className="h-4 w-4" />
-                  Refresh
-                </Button>
-              </form>
-            </Card>
+              <div className="h-6 w-px bg-border" />
+
+              <Input
+                placeholder="tìm theo phòng hoặc mã hóa đơn..."
+                className="border-none bg-transparent focus-visible:ring-0 text-base h-10 w-full"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                rightIcon={
+                  searchQuery.length > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0 rounded-full"
+                      onClick={() => setSearchQuery("")}
+                    >
+                      <X size={16} />
+                    </Button>
+                  )
+                }
+              />
+
+              <div className="h-6 w-px bg-border" />
+
+              <div className="flex items-center gap-2 px-2 shrink-0">
+                <Calendar size={16} className="text-muted-foreground" />
+                <input
+                  type="date"
+                  className="bg-transparent text-xs outline-none text-muted-foreground cursor-pointer"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                />
+                <span className="text-muted-foreground text-xs">→</span>
+                <input
+                  type="date"
+                  className="bg-transparent text-xs outline-none text-muted-foreground cursor-pointer"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                />
+              </div>
+
+              <div className="h-6 w-px bg-border" />
+
+              <Button
+                variant="outline"
+                className="rounded-xl h-10 px-4 flex gap-2 shrink-0 border-none hover:bg-muted font-medium text-sm text-muted-foreground"
+                onClick={() => {
+                  setSearchQuery("");
+                  setPaymentStatus("all");
+                  setStartDate("");
+                  setEndDate("");
+                  setReloadKey((prev) => prev + 1);
+                }}
+              >
+                <RefreshCw size={16} />
+                làm mới
+              </Button>
+            </div>
 
             <Card className="p-0">
               {loading ? (
                 <div className="flex min-h-64 items-center justify-center gap-3 text-muted-foreground">
                   <Spinner className="h-6 w-6 text-primary" />
-                  Loading payments...
-                </div>
-              ) : error ? (
-                <div className="min-h-64 p-8 text-center text-destructive">
-                  {error}
+                  đang tải dữ liệu thanh toán...
                 </div>
               ) : (
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead>Payment ID</TableHead>
-                      <TableHead>Invoice number</TableHead>
-                      <TableHead>Household / room</TableHead>
-                      <TableHead>Amount</TableHead>
-                      <TableHead>Payment method</TableHead>
-                      <TableHead>Payment date</TableHead>
-                      <TableHead>Note</TableHead>
+                    <TableRow className="bg-muted/50">
+                      <TableHead>mã hóa đơn</TableHead>
+                      <TableHead>phòng / hộ</TableHead>
+                      <TableHead>thời gian giao dịch</TableHead>
+                      <TableHead>số tiền nộp</TableHead>
+                      <TableHead>trạng thái</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {payments.length === 0 ? (
                       <TableRow>
-                        <TableCell
-                          colSpan={7}
-                          className="py-12 text-center text-muted-foreground"
-                        >
-                          No payments found.
+                        <TableCell colSpan={5} className="text-center py-10 text-muted-foreground">
+                          không có dữ liệu thanh toán phù hợp
                         </TableCell>
                       </TableRow>
                     ) : (
-                      payments.map((payment) => (
-                        <TableRow key={payment.id}>
-                          <TableCell className="font-medium">{payment.id}</TableCell>
-                          <TableCell>{payment.invoice?.invoice_number || payment.invoice_id}</TableCell>
-                          <TableCell>{getHouseholdLabel(payment)}</TableCell>
-                          <TableCell>{formatCurrency(payment.amount)}</TableCell>
-                          <TableCell>{payment.payment_method}</TableCell>
-                          <TableCell>{formatDateTime(payment.payment_date)}</TableCell>
-                          <TableCell>{payment.note || '-'}</TableCell>
-                        </TableRow>
-                      ))
+                      payments.map((payment) => {
+                        const inv = payment.invoice || payment.Invoice;
+                        const room = inv?.household?.room_number || inv?.household_id || "n/a";
+
+                        return (
+                          <TableRow key={payment.id}>
+                            <TableCell className="font-mono text-xs text-primary uppercase">
+                              {inv?.invoice_number || "n/a"}
+                            </TableCell>
+                            <TableCell className="font-bold">
+                              phòng {room}
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              {formatDateTime(payment.payment_date)}
+                            </TableCell>
+                            <TableCell className="font-medium text-green-600">
+                              +{formatCurrency(payment.amount)}
+                            </TableCell>
+                            <TableCell>
+                              <Tag color="green">thành công</Tag>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
                     )}
                   </TableBody>
                 </Table>

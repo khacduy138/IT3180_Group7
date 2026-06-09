@@ -8,6 +8,7 @@ const router = express.Router();
 
 router.use(authenticate);
 
+router.get('/payments', authorize({ permission: 'payments:read' }), billingController.listPayments);
 router.get('/', authorize({ permission: 'invoices:read' }), billingController.listInvoices);
 router.get('/:id', authorize({ permission: 'invoices:read' }), billingController.getInvoice);
 router.post('/', authorize({ permission: 'invoices:write' }), billingController.createInvoice);

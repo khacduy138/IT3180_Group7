@@ -5,7 +5,6 @@ import {
   Receipt,
   Home,
   Wallet,
-  History,
 } from "lucide-react";
 
 export const TOP_BAR_ITEMS = [
@@ -40,13 +39,7 @@ export const TOP_BAR_ITEMS = [
     allowedRoles: ["admin", "manager", "accountant"],
   },
   {
-    label: "History",
-    path: "/payments/history",
-    icon: History,
-    allowedRoles: ["admin", "manager", "accountant"],
-  },
-  {
-    label: "Fees",
+    label: "Đợt thu",
     path: "/fees",
     icon: Banknote,
     allowedRoles: ["admin", "manager", "accountant"],
