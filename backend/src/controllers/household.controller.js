@@ -109,7 +109,9 @@ const getHousehold = async (req, res, next) => {
 
 const createHousehold = async (req, res, next) => {
   try {
-    const { roomNumber, squareMeters, status } = req.body;
+    const roomNumber = req.body.roomNumber ?? req.body.room_number;
+    const squareMeters = req.body.squareMeters ?? req.body.square_meters;
+    const { status } = req.body;
     const errors = [];
 
     if (!roomNumber || typeof roomNumber !== 'string' || !roomNumber.trim()) {
@@ -299,9 +301,7 @@ const addResident = async (req, res, next) => {
       errors.push({ field: 'gender', code: 'VAL_001', message: 'gender is required' });
     }
 
-    if (!moveInDate) {
-      errors.push({ field: 'moveInDate', code: 'VAL_001', message: 'moveInDate is required' });
-    }
+    const resolvedMoveInDate = moveInDate || new Date().toISOString().slice(0, 10);
 
     if (errors.length) {
       await transaction.rollback();
@@ -335,7 +335,7 @@ const addResident = async (req, res, next) => {
         household_id: household.id,
         resident_id: resident.id,
         relationship_to_head: relationshipToHead || null,
-        move_in_date: moveInDate,
+        move_in_date: resolvedMoveInDate,
       },
       { transaction },
     );
