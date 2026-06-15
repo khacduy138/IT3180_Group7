@@ -19,16 +19,47 @@ const inputVariants = cva(
   }
 );
 
-const Input = React.forwardRef(({ className, type, variant, ...props }, ref) => {
-  return (
-    <input
-      type={type}
-      className={cn(inputVariants({ variant, className }))}
-      ref={ref}
-      {...props}
-    />
-  );
-});
+const Input = React.forwardRef(
+  ({ className, type, variant, leftIcon, rightIcon, wrapperClassName, ...props }, ref) => {
+    const hasIcon = !!leftIcon || !!rightIcon;
+
+    const inputElement = (
+      <input
+        type={type}
+        className={cn(
+          inputVariants({ variant, className }),
+          leftIcon && "pl-10", 
+          rightIcon && "pr-10" 
+        )}
+        ref={ref}
+        {...props}
+      />
+    );
+
+    if (!hasIcon) {
+      return inputElement;
+    }
+
+    return (
+      <div className={cn("relative flex items-center w-full", wrapperClassName)}>
+        {leftIcon && (
+          <div className="absolute left-3 flex items-center justify-center text-muted-foreground pointer-events-none">
+            {leftIcon}
+          </div>
+        )}
+        
+        {inputElement}
+
+        {rightIcon && (
+          <div className="absolute right-3 flex items-center justify-center text-muted-foreground">
+            {rightIcon}
+          </div>
+        )}
+      </div>
+    );
+  }
+);
+
 Input.displayName = "Input";
 
 export { Input, inputVariants };

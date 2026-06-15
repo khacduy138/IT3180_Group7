@@ -1,12 +1,14 @@
-import { useEffect, useState } from 'react';
-import { RefreshCw } from 'lucide-react';
+import { useEffect, useState } from "react";
+import { RefreshCw, Search, X, ExternalLink } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
-import TopBar from '../../components/ui/TopBar';
-import Sidebar from '../../components/ui/Sidebar';
-import { Button } from '../../components/ui/Button';
-import { Card } from '../../components/ui/Card';
-import { Select } from '../../components/ui/Select';
-import { Spinner } from '../../components/ui/Spinner';
+import TopBar from "../../components/ui/TopBar";
+import Sidebar from "../../components/ui/Sidebar";
+import { Button } from "../../components/ui/Button";
+import { Card } from "../../components/ui/Card";
+import { Input } from "../../components/ui/Input";
+import { Select } from "../../components/ui/Select";
+import { Spinner } from "../../components/ui/Spinner";
 import {
   Table,
   TableBody,
@@ -14,43 +16,45 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '../../components/ui/Table';
-import { Tag } from '../../components/ui/Tag';
+} from "../../components/ui/Table";
+import { Tag } from "../../components/ui/Tag";
 
 const STATUS_OPTIONS = [
-  { value: '', label: 'All statuses' },
-  { value: 'PENDING', label: 'Pending' },
-  { value: 'PARTIAL', label: 'Partially paid' },
-  { value: 'PAID', label: 'Paid' },
+  { value: "", label: "All statuses" },
+  { value: "PENDING", label: "Pending" },
+  { value: "PARTIAL", label: "Partially paid" },
+  { value: "PAID", label: "Paid" },
 ];
 
 const STATUS_TAGS = {
-  PENDING: { label: 'Pending', color: 'red' },
-  PARTIAL: { label: 'Partially paid', color: 'yellow' },
-  PAID: { label: 'Paid', color: 'green' },
+  PENDING: { label: "Pending", color: "red" },
+  PARTIAL: { label: "Partially paid", color: "yellow" },
+  PAID: { label: "Paid", color: "green" },
 };
 
 const formatCurrency = (value) =>
-  new Intl.NumberFormat('vi-VN', {
-    style: 'currency',
-    currency: 'VND',
+  new Intl.NumberFormat("vi-VN", {
+    style: "currency",
+    currency: "VND",
   }).format(Number(value || 0));
 
 const formatDate = (value) => {
   if (!value) {
-    return '-';
+    return "-";
   }
 
-  return new Intl.DateTimeFormat('vi-VN').format(new Date(`${value}T00:00:00`));
+  return new Intl.DateTimeFormat("vi-VN").format(new Date(`${value}T00:00:00`));
 };
 
 export default function InvoiceListPage() {
+  const navigate = useNavigate();
+
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [periodId, setPeriodId] = useState('');
-  const [status, setStatus] = useState('');
+  const [periodId, setPeriodId] = useState("");
+  const [status, setStatus] = useState("");
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
@@ -58,14 +62,14 @@ export default function InvoiceListPage() {
 
     const fetchInvoices = async () => {
       setLoading(true);
-      setError('');
+      setError("");
 
-      const params = new URLSearchParams({ pageSize: '100' });
+      const params = new URLSearchParams({ pageSize: "100" });
       if (periodId.trim()) {
-        params.set('feePeriodId', periodId.trim());
+        params.set("feePeriodId", periodId.trim());
       }
       if (status) {
-        params.set('status', status);
+        params.set("status", status);
       }
 
       try {
@@ -73,22 +77,22 @@ export default function InvoiceListPage() {
           `http://localhost:3001/api/invoices?${params.toString()}`,
           {
             headers: {
-              Authorization: `Bearer ${localStorage.getItem('token')}`,
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
             },
             signal: controller.signal,
-          }
+          },
         );
         const result = await response.json();
 
         if (!response.ok) {
-          throw new Error(result.message || 'Unable to load invoices');
+          throw new Error(result.message || "Unable to load invoices");
         }
 
         setInvoices(result.data || []);
       } catch (requestError) {
-        if (requestError.name !== 'AbortError') {
+        if (requestError.name !== "AbortError") {
           setInvoices([]);
-          setError(requestError.message || 'Unable to connect to the server');
+          setError(requestError.message || "Unable to connect to the server");
         }
       } finally {
         if (!controller.signal.aborted) {
@@ -113,49 +117,87 @@ export default function InvoiceListPage() {
 
         <main
           className={`flex-1 p-8 transition-all duration-300 ${
-            sidebarOpen ? 'ml-64' : 'ml-0'
+            sidebarOpen ? "ml-64" : "ml-0"
           }`}
         >
           <div className="mx-auto max-w-7xl space-y-6">
             <div>
-              <h1 className="text-3xl font-bold tracking-tight">Invoices</h1>
+              <h1 className="text-3xl font-bold tracking-tight">Hóa đơn</h1>
               <p className="mt-1 text-muted-foreground">
-                Review household invoices and payment status.
+                Xem và quản lý hóa đơn của các hộ gia đình.
               </p>
             </div>
-
-            <Card className="flex flex-wrap items-end gap-4">
-              <label className="min-w-56 space-y-2 text-sm font-medium">
-                <span>Fee period ID</span>
-                <input
-                  type="number"
-                  min="1"
-                  value={periodId}
-                  onChange={(event) => setPeriodId(event.target.value)}
-                  placeholder="All fee periods"
-                  className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
-                />
-              </label>
-
-              <label className="min-w-56 space-y-2 text-sm font-medium">
-                <span>Status</span>
+            <div className="flex items-center justify-between">
+              <div className="flex gap-2 items-center bg-card p-1.5 rounded-2xl border border-border shadow-sm transition-all w-full max-w-2xl">
                 <Select
+                  variant="subtle"
+                  size="sm"
                   value={status}
                   onValueChange={setStatus}
                   options={STATUS_OPTIONS}
-                  className="w-full"
+                  className="h-9 rounded-xl bg-muted/50 border-none font-medium min-w-[150px]"
                 />
-              </label>
+
+                <div className="h-6 w-px bg-border" />
+
+                <Input
+                  type="number"
+                  min="1"
+                  placeholder="nhập mã kỳ thu phí..."
+                  className="border-none bg-transparent focus-visible:ring-0 text-base h-10 w-full"
+                  value={periodId}
+                  onChange={(e) => setPeriodId(e.target.value)}
+                  rightIcon={
+                    periodId.toString().length > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0 rounded-full"
+                        onClick={() => setPeriodId("")}
+                      >
+                        <X size={16} />
+                      </Button>
+                    )
+                  }
+                />
+
+                <div className="h-6 w-px bg-border" />
+
+                <Button
+                  variant="icon"
+                  className="rounded-xl h-10 w-12 p-0 flex shrink-0"
+                  onClick={() => setReloadKey((prev) => prev + 1)}
+                >
+                  <Search size={18} />
+                </Button>
+
+                <div className="h-6 w-px bg-border" />
+
+                <Button
+                  variant="outline"
+                  className="rounded-xl h-10 px-4 flex gap-2 shrink-0 border-none hover:bg-muted font-medium text-sm"
+                  onClick={() => {
+                    setPeriodId("");
+                    setStatus("");
+                    setReloadKey((prev) => prev + 1);
+                  }}
+                >
+                  <RefreshCw size={16} />
+                  làm mới
+                </Button>
+              </div>
 
               <Button
-                type="button"
-                variant="outline"
-                onClick={() => setReloadKey((current) => current + 1)}
+                variant="default"
+                
+                onClick={() => {
+                  navigate("/payments/history");
+                }}
               >
-                <RefreshCw className="h-4 w-4" />
-                Refresh
+
+                <ExternalLink/>Lịch sử giao dịch
               </Button>
-            </Card>
+            </div>
 
             <Card className="p-0">
               {loading ? (
@@ -171,12 +213,12 @@ export default function InvoiceListPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Invoice number</TableHead>
-                      <TableHead>Household / room</TableHead>
-                      <TableHead>Total amount</TableHead>
-                      <TableHead>Paid amount</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Due date</TableHead>
+                      <TableHead>Mã hóa đơn</TableHead>
+                      <TableHead>Hộ gia đình / Phòng</TableHead>
+                      <TableHead>Tổng số tiền</TableHead>
+                      <TableHead>Số tiền đã thanh toán</TableHead>
+                      <TableHead>Trạng thái</TableHead>
+                      <TableHead>Ngày đáo hạn</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -193,7 +235,7 @@ export default function InvoiceListPage() {
                       invoices.map((invoice) => {
                         const statusTag = STATUS_TAGS[invoice.status] || {
                           label: invoice.status,
-                          color: 'red',
+                          color: "red",
                         };
 
                         return (
@@ -202,14 +244,23 @@ export default function InvoiceListPage() {
                               {invoice.invoice_number}
                             </TableCell>
                             <TableCell>
-                              {invoice.household?.room_number || invoice.household_id}
+                              {invoice.household?.room_number ||
+                                invoice.household_id}
                             </TableCell>
-                            <TableCell>{formatCurrency(invoice.total_amount)}</TableCell>
-                            <TableCell>{formatCurrency(invoice.paid_amount)}</TableCell>
                             <TableCell>
-                              <Tag color={statusTag.color}>{statusTag.label}</Tag>
+                              {formatCurrency(invoice.total_amount)}
                             </TableCell>
-                            <TableCell>{formatDate(invoice.due_date)}</TableCell>
+                            <TableCell>
+                              {formatCurrency(invoice.paid_amount)}
+                            </TableCell>
+                            <TableCell>
+                              <Tag color={statusTag.color}>
+                                {statusTag.label}
+                              </Tag>
+                            </TableCell>
+                            <TableCell>
+                              {formatDate(invoice.due_date)}
+                            </TableCell>
                           </TableRow>
                         );
                       })

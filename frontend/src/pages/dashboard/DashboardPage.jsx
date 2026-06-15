@@ -22,7 +22,8 @@ import {
   CreditCard,
   AlertCircle,
   Filter,
-  ExternalLink 
+  ExternalLink, 
+  Search
 } from "lucide-react";
 
 // Import Layout & UI Components
@@ -353,20 +354,28 @@ export default function DashboardPage() {
             <div className="max-w-7xl mx-auto space-y-8">
               <div className="flex justify-between items-end">
                 <div>
-                  <h1 className="text-4xl font-bold tracking-tight text-foreground">
+                  <h1 className="text-3xl font-bold tracking-tight text-foreground">
                     Dashboard
                   </h1>
                   <p className="text-muted-foreground mt-1">
                     Chào mừng quay trở lại, Admin.
                   </p>
                 </div>
+                <div className="flex gap-2">
+                <Button
+                variant="outline"
+                  className="gap-2"
+                  onClick={() => navigate("/reports")}>
+                       <ExternalLink size={16} /> Chi tiết tình trạng thu phí
+                </Button>
                 <Button
                   variant="default"
                   className="gap-2"
                   onClick={handleExport}
                 >
-                  <Download size={18} /> Quick export
+                  <Download size={16} /> Xuất báo cáo nhanh
                 </Button>
+                </div>
               </div>
               <SmartSearch
                 endpoint="http://localhost:3001/api/dashboard/search"
@@ -673,7 +682,7 @@ export default function DashboardPage() {
                   </Card>
                   <Card>
                     <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-semibold">
+                      <CardTitle className="text-sm">
                         Cơ cấu giới tính
                       </CardTitle>
                     </CardHeader>
@@ -721,12 +730,13 @@ export default function DashboardPage() {
                     <div className=""> 
                     <Input
                       placeholder="tìm phòng, mã hđ..."
-                      className="w-48 h-9"
+                      className="w-48"
                       value={tableFilters.q}
                       onChange={(e) =>
                         setTableFilters({ ...tableFilters, q: e.target.value })
                       }
                       onKeyDown={(e) => e.key === "Enter" && fetchTableData()}
+                      leftIcon={<Search className="w-[16px] h-[16px]" />}
                     />
                     </div>
                     <div className="flex items-center gap-2">

@@ -80,7 +80,7 @@ export default function SmartSearch({
 
   return (
     <div className={cn("relative w-full", className)} ref={searchRef}>
-      <div className="flex gap-2 items-center bg-card p-2 rounded-lg border border-border shadow-sm focus-within:ring-2 focus-within:ring-primary/20 transition-all">
+      <div className="flex gap-2 items-center bg-card p-2 rounded-lg border border-border shadow-sm transition-all">
         {/* 1. Lọc Loại dữ liệu */}
         <Select
           variant="subtle"
@@ -88,8 +88,10 @@ export default function SmartSearch({
           value={activeCategory}
           onValueChange={setActiveCategory}
           options={categories}
-          className="h-9 rounded-xl border-none bg-muted/50"
+          className="h-9 rounded-xl border-none w-24"
         />
+
+        <div className="h-6 w-px bg-border"></div>
 
         {/* 2. Ô nhập Query (Tên/CCCD/Mã HĐ) */}
         <Input
@@ -104,7 +106,7 @@ export default function SmartSearch({
 
         {/* 3. Lọc Khoảng thời gian (Inline) */}
         <div className="hidden lg:flex items-center gap-2 border-l border-border pl-4 px-2">
-          <Calendar size={16} className="text-muted-foreground" />
+          <Calendar className="text-muted-foreground w-[16px] h-[16px]" />
           <input
             type="date"
             className="bg-transparent text-xs outline-none text-muted-foreground cursor-pointer"
@@ -137,10 +139,10 @@ export default function SmartSearch({
                 setDateRange({ start: "", end: "" });
               }}
             >
-              <X size={18} />
+              <X className="w-[16px] h-[16px]" />
             </Button>
           ) : (
-            <Search size={18} className="text-muted-foreground" />
+            <Search  className="text-muted-foreground w-[16px] h-[16px]" />
           )}
         </div>
       </div>

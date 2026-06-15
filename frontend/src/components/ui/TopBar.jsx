@@ -15,7 +15,7 @@ export default function TopBar({ onToggleSidebar, sidebarOpen }) {
     return (
         <div className="sticky top-0 z-40 w-full border-b border-border bg-background px-6 h-16 grid grid-cols-4 text-foreground">
             <div className=" flex items-center gap-4 justify-start">
-                <span className="text-lg font-black text-primary">BMS</span>
+                <span className="text-xl font-black min-w-12"><span className="text-primary">B</span>MS</span>
                 <Button 
                     size="icon" 
                     variant="outline"
@@ -25,7 +25,7 @@ export default function TopBar({ onToggleSidebar, sidebarOpen }) {
                     >
                     {sidebarOpen ? <SidebarClose className="h-5 w-5" /> : <SidebarOpen className="h-5 w-5" />}
                 </Button>
-                <Input placeholder="Search..." className="w-44" />
+                <Input placeholder="Tìm kiếm công cụ..." className="w-48" />
             </div>
             <div className=" flex items-center gap-4 justify-center col-span-2">
                 {visibleItems.map((item) => (
