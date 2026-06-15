@@ -5,6 +5,7 @@ const {
   FeeTypePriceHistory,
   FeePeriod,
   PeriodFee,
+  FeeUsage,
   UtilityInvoice,
   InvoiceItem,
   Household,
@@ -397,8 +398,33 @@ const createFeePeriod = async (req, res, next) => {
         fee_period_id: feePeriod.id,
         fee_type_id: feeTypeId,
       }));
-
       await PeriodFee.bulkCreate(periodFees, { transaction });
+
+      for (const feeTypeId of feeTypeIds) {
+        const latestHistory = await FeeTypePriceHistory.findOne({
+          where: {
+            fee_type_id: feeTypeId,
+            effective_from: { [require('sequelize').Op.lte]: startDate },
+          },
+          order: [['effective_from', 'DESC']],
+          transaction,
+        }) || await FeeTypePriceHistory.findOne({
+          where: { fee_type_id: feeTypeId },
+          order: [['effective_from', 'ASC']],
+          transaction,
+        });
+        if (latestHistory) {
+          await sequelize.query(
+            `INSERT INTO fee_period_fee_types (fee_period_id, fee_type_id, price_history_id, is_required, created_at, updated_at)
+             VALUES (:periodId, :feeTypeId, :priceHistoryId, 1, NOW(), NOW())
+             ON DUPLICATE KEY UPDATE price_history_id = VALUES(price_history_id), updated_at = NOW()`,
+            {
+              replacements: { periodId: feePeriod.id, feeTypeId, priceHistoryId: latestHistory.id },
+              transaction,
+            }
+          );
+        }
+      }
     }
 
     await transaction.commit();
@@ -470,6 +496,14 @@ const activateFeePeriod = async (req, res, next) => {
 
     if (!feePeriod) {
       return sendError(res, 404, 'Fee period not found');
+    }
+
+    if (feePeriod.status === 'ACTIVE') {
+      return sendError(res, 409, 'Fee period is already active');
+    }
+
+    if (feePeriod.status === 'CLOSED') {
+      return sendError(res, 409, 'Cannot activate a closed fee period');
     }
 
     feePeriod.status = 'ACTIVE';
@@ -719,6 +753,7 @@ const createUtilityInvoice = async (req, res, next) => {
       currentReading,
       usageAmount,
       unitPrice,
+      feeTypeId,
     } = req.body;
 
     const errors = [];
@@ -803,24 +838,53 @@ const createUtilityInvoice = async (req, res, next) => {
       );
     }
 
-    const utilityInvoice = await UtilityInvoice.create({
-      fee_period_id: feePeriodId,
-      household_id: householdId,
-      utility_type: utilityType,
-      previous_reading: previousReading || null,
-      current_reading: currentReading || null,
-      usage_amount: usageAmountNumber,
-      unit_price: unitPriceNumber,
-      total_amount: totalAmount,
-      status: 'draft',
-    });
+    const t = await sequelize.transaction();
+    try {
+      const utilityInvoice = await UtilityInvoice.create({
+        fee_period_id: feePeriodId,
+        household_id: householdId,
+        utility_type: utilityType,
+        previous_reading: previousReading || null,
+        current_reading: currentReading || null,
+        usage_amount: usageAmountNumber,
+        unit_price: unitPriceNumber,
+        total_amount: totalAmount,
+        status: 'draft',
+      }, { transaction: t });
 
-    return sendSuccess(
-      res,
-      201,
-      'Utility invoice created successfully',
-      utilityInvoice
-    );
+      if (feeTypeId) {
+        const periodFee = await PeriodFee.findOne({
+          where: { fee_period_id: feePeriodId, fee_type_id: feeTypeId },
+          transaction: t,
+        });
+        if (periodFee) {
+          const existingUsage = await FeeUsage.findOne({
+            where: { period_fee_id: periodFee.id, household_id: householdId },
+            transaction: t,
+          });
+          if (!existingUsage) {
+            await FeeUsage.create({
+              household_id: householdId,
+              period_fee_id: periodFee.id,
+              quantity: usageAmountNumber,
+              note: `${utilityType} - ${usageAmountNumber} units`,
+              entered_by: req.user.id,
+            }, { transaction: t });
+          }
+        }
+      }
+
+      await t.commit();
+      return sendSuccess(
+        res,
+        201,
+        'Utility invoice created successfully',
+        utilityInvoice
+      );
+    } catch (innerErr) {
+      await t.rollback();
+      throw innerErr;
+    }
   } catch (error) {
     return next(error);
   }

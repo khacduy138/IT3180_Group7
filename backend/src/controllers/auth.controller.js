@@ -122,12 +122,13 @@ function logout(req, res) {
 }
 
 async function changePassword(req, res) {
-  const { old_password, new_password } = req.body;
+  const { old_password, current_password, new_password } = req.body;
+  const currentPw = old_password || current_password;
 
-  if (!old_password || !new_password) {
+  if (!currentPw || !new_password) {
     return res
       .status(400)
-      .json({ message: 'old_password and new_password are required' });
+      .json({ message: 'old_password (or current_password) and new_password are required' });
   }
 
   try {
@@ -142,7 +143,7 @@ async function changePassword(req, res) {
     }
 
     const oldPasswordMatches = await bcrypt.compare(
-      old_password,
+      currentPw,
       user.password_hash,
     );
 

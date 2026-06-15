@@ -157,7 +157,7 @@ const generateInvoicesForFeePeriod = async (req, res, next) => {
       return sendError(res, 409, 'Invoices already exist for this fee period');
     }
 
-    const [periodFees, households] = await Promise.all([
+    const [periodFees, households, feePeriodFeeTypes] = await Promise.all([
       PeriodFee.findAll({
         where: { fee_period_id: feePeriodId },
         include: [{ model: FeeType, as: 'fee_type', required: true }],
@@ -178,9 +178,20 @@ const generateInvoicesForFeePeriod = async (req, res, next) => {
         ],
         order: [['id', 'ASC']],
       }),
+      sequelize.query(
+        `SELECT pfft.fee_type_id, ph.unit_price as snapshot_price
+         FROM fee_period_fee_types pfft
+         LEFT JOIN fee_type_price_history ph ON ph.id = pfft.price_history_id
+         WHERE pfft.fee_period_id = :feePeriodId`,
+        { replacements: { feePeriodId }, type: sequelize.QueryTypes.SELECT }
+      ),
     ]);
 
-    const periodFeeIds = periodFees.map((periodFee) => periodFee.id);
+    const snapshotByFeeTypeId = new Map(
+      feePeriodFeeTypes.map((r) => [Number(r.fee_type_id), Number(r.snapshot_price)])
+    );
+
+    const periodFeeIds = periodFees.map((pf) => pf.id);
     const feeUsages = periodFeeIds.length
       ? await FeeUsage.findAll({
           where: { period_fee_id: periodFeeIds },
@@ -195,9 +206,14 @@ const generateInvoicesForFeePeriod = async (req, res, next) => {
       usagesByHousehold.set(usage.household_id, householdUsages);
     }
 
-    const normalizedPeriodFees = periodFees.map((periodFee) =>
-      periodFee.get({ plain: true })
-    );
+    const normalizedPeriodFees = periodFees.map((periodFee) => {
+      const plain = periodFee.get({ plain: true });
+      const snapshotPrice = snapshotByFeeTypeId.get(Number(plain.fee_type_id));
+      if (snapshotPrice !== undefined && plain.fee_type) {
+        plain.fee_type = { ...plain.fee_type, unit_price: snapshotPrice };
+      }
+      return plain;
+    });
     const createdInvoiceIds = [];
     const failed = [];
     const dueDate = req.body?.dueDate || feePeriod.end_date || null;
