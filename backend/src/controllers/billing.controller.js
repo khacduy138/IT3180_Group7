@@ -545,9 +545,17 @@ const createPayment = async (req, res, next) => {
 
 const listPayments = async (req, res, next) => {
   try {
-    const { q, status, startDate, endDate } = req.query;
+    const { q, status, startDate, endDate, invoiceId } = req.query;
     const where = {};
     const andConditions = [];
+
+    if (invoiceId !== undefined && invoiceId !== '') {
+      const parsedInvoiceId = parseInt(invoiceId, 10);
+      if (isNaN(parsedInvoiceId)) {
+        return res.status(400).json({ success: false, message: 'invoiceId không hợp lệ' });
+      }
+      where.invoice_id = parsedInvoiceId;
+    }
 
     if (status && status !== 'all') {
       where.payment_method = status;
