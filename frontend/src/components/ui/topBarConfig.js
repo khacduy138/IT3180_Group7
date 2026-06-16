@@ -5,6 +5,7 @@ import {
   Receipt,
   Home,
   Wallet,
+  Settings,
 } from "lucide-react";
 
 export const TOP_BAR_ITEMS = [

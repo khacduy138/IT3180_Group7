@@ -3,12 +3,13 @@ import { Button } from './Button';
 import {Input} from './Input';
 import { Avatar, AvatarImage, AvatarFallback } from './Avatar';
 import { Settings, Bell, SidebarOpen, SidebarClose } from 'lucide-react';
-
+import { useNavigate } from 'react-router-dom';
 
 import { TOP_BAR_ITEMS } from './topBarConfig';
 
 export default function TopBar({ onToggleSidebar, sidebarOpen }) {
     const userRole = localStorage.getItem('userRole') || 'customer';
+    const navigate = useNavigate();
 
     const visibleItems = TOP_BAR_ITEMS.filter(item => item.allowedRoles.includes(userRole));
 
@@ -38,7 +39,10 @@ export default function TopBar({ onToggleSidebar, sidebarOpen }) {
             </div>
             <div className=" flex items-center justify-end gap-4">
                 <Bell className="cursor-pointer" />
-                <Settings className="cursor-pointer" />
+                <Settings
+                    className="cursor-pointer"
+                    onClick={() => navigate('/settings')}
+                />
                 <Avatar>
                     <AvatarImage src="/placeholder-user.jpg" alt="User" />
                     <AvatarFallback>
