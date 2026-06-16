@@ -2,6 +2,7 @@ import { BrowserRouter, Link, Navigate, Route, Routes } from 'react-router-dom';
 import { buttonVariants } from './components/ui/Button';
 import UISample from './pages/UISample';
 import LoginPage from './pages/auth/LoginPage';
+import UnauthorizedPage from './pages/UnauthorizedPage';
 import DashboardPage from './pages/dashboard/DashboardPage';
 import UserManagementPage from './pages/auth/UserManagementPage';
 import InvoiceListPage from './pages/billing/InvoiceListPage';
@@ -16,10 +17,16 @@ import UtilityInvoiceForm from './pages/fees/UtilityInvoiceForm';
 import ReportPage from './pages/dashboard/ReportPage';
 import SettingsPage from './pages/settings/SettingsPage';
 
-function ProtectedRoute({ children }) {
+function ProtectedRoute({ children, allowedRoles }) {
   const token = localStorage.getItem('token');
   if (!token) {
     return <Navigate to="/login" replace />;
+  }
+  if (allowedRoles) {
+    const userRole = localStorage.getItem('userRole');
+    if (!allowedRoles.includes(userRole)) {
+      return <Navigate to="/unauthorized" replace />;
+    }
   }
   return children;
 }
@@ -48,10 +55,11 @@ function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/uisample" element={<UISample />} />
+        <Route path="/unauthorized" element={<UnauthorizedPage />} />
         <Route
           path="/dashboard"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={['admin', 'accountant']}>
               <DashboardPage />
             </ProtectedRoute>
           }
@@ -59,7 +67,7 @@ function App() {
         <Route
           path="/users"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={['admin']}>
               <UserManagementPage />
             </ProtectedRoute>
           }
@@ -67,7 +75,7 @@ function App() {
         <Route
           path="/billing"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={['admin', 'accountant']}>
               <InvoiceListPage />
             </ProtectedRoute>
           }
@@ -75,7 +83,7 @@ function App() {
         <Route
           path="/payments"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={['admin', 'accountant']}>
               <PaymentPage />
             </ProtectedRoute>
           }
@@ -83,7 +91,7 @@ function App() {
         <Route
           path="/payments/history"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={['admin', 'accountant']}>
               <PaymentHistoryPage />
             </ProtectedRoute>
           }
@@ -91,7 +99,7 @@ function App() {
         <Route
           path="/households"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={['admin', 'staff']}>
               <HouseholdsListPage />
             </ProtectedRoute>
           }
@@ -99,7 +107,7 @@ function App() {
         <Route
           path="/households/:id"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={['admin', 'staff']}>
               <HouseholdDetailPage />
             </ProtectedRoute>
           }
@@ -107,7 +115,7 @@ function App() {
         <Route
           path="/fees"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={['admin', 'accountant']}>
               <FeeListPage />
             </ProtectedRoute>
           }
@@ -115,7 +123,7 @@ function App() {
         <Route
           path="/fees/new"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={['admin', 'accountant']}>
               <FeePeriodForm />
             </ProtectedRoute>
           }
@@ -123,7 +131,7 @@ function App() {
         <Route
           path="/fees/utility-invoices/new"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={['admin', 'accountant']}>
               <UtilityInvoiceForm />
             </ProtectedRoute>
           }
@@ -131,7 +139,7 @@ function App() {
         <Route
           path="/fee-types"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={['admin', 'accountant']}>
               <FeeTypeListPage />
             </ProtectedRoute>
           }
@@ -139,7 +147,7 @@ function App() {
         <Route
           path="/reports"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={['admin', 'accountant']}>
               <ReportPage />
             </ProtectedRoute>
           }
