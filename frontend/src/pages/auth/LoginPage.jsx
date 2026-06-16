@@ -37,6 +37,13 @@ export default function LoginPage() {
         localStorage.setItem('userRole', result.user.role.name);
         localStorage.setItem('username', result.user.username);
 
+        const roleRedirectMap = {
+          admin: '/dashboard',
+          accountant: '/billing',
+          staff: '/households',
+        };
+        const redirectPath = roleRedirectMap[result.user.role.name] || '/dashboard';
+
         setToast({
           open: true,
           variant: 'success',
@@ -44,7 +51,7 @@ export default function LoginPage() {
           description: 'Chào mừng bạn quay trở lại!',
         });
 
-        setTimeout(() => navigate('/dashboard'), 1500);
+        setTimeout(() => navigate(redirectPath), 1500);
       } else {
         throw new Error(result.message || 'Đăng nhập thất bại');
       }

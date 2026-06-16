@@ -50,6 +50,7 @@ const rolePermissions = {
     'payments:read',
     'payments:write',
     'fees:read',
+    'reports:read',
   ],
   staff: [
     'households:read',
@@ -81,7 +82,13 @@ module.exports = {
   async up(queryInterface) {
     const defaultAdminPassword =
       process.env.DEFAULT_ADMIN_PASSWORD || 'admin123456';
+    const defaultAccountantPassword =
+      process.env.DEFAULT_ACCOUNTANT_PASSWORD || 'accountant123456';
+    const defaultStaffPassword =
+      process.env.DEFAULT_STAFF_PASSWORD || 'staff123456';
     const adminPasswordHash = await bcrypt.hash(defaultAdminPassword, 10);
+    const accountantPasswordHash = await bcrypt.hash(defaultAccountantPassword, 10);
+    const staffPasswordHash = await bcrypt.hash(defaultStaffPassword, 10);
 
     await queryInterface.sequelize.transaction(async (transaction) => {
       for (const role of roles) {
@@ -172,37 +179,46 @@ module.exports = {
         }
       }
 
-      await queryInterface.sequelize.query(
-        `
-        INSERT INTO users (
-          username,
-          password_hash,
-          role_id,
-          is_active,
-          created_at,
-          updated_at
-        )
-        SELECT
-          'admin',
-          :passwordHash,
-          :roleId,
-          TRUE,
-          NOW(),
-          NOW()
-        WHERE NOT EXISTS (
-          SELECT 1
-          FROM users
-          WHERE username = 'admin'
-        )
-        `,
-        {
-          replacements: {
-            passwordHash: adminPasswordHash,
-            roleId: roleIds.admin,
+      const defaultUsers = [
+        { username: 'admin', passwordHash: adminPasswordHash, roleKey: 'admin' },
+        { username: 'accountant', passwordHash: accountantPasswordHash, roleKey: 'accountant' },
+        { username: 'staff', passwordHash: staffPasswordHash, roleKey: 'staff' },
+      ];
+
+      for (const user of defaultUsers) {
+        await queryInterface.sequelize.query(
+          `
+          INSERT INTO users (
+            username,
+            password_hash,
+            role_id,
+            is_active,
+            created_at,
+            updated_at
+          )
+          SELECT
+            :username,
+            :passwordHash,
+            :roleId,
+            TRUE,
+            NOW(),
+            NOW()
+          WHERE NOT EXISTS (
+            SELECT 1
+            FROM users
+            WHERE username = :username
+          )
+          `,
+          {
+            replacements: {
+              username: user.username,
+              passwordHash: user.passwordHash,
+              roleId: roleIds[user.roleKey],
+            },
+            transaction,
           },
-          transaction,
-        },
-      );
+        );
+      }
     });
   },
 
@@ -238,7 +254,7 @@ module.exports = {
       }
 
       await queryInterface.sequelize.query(
-        "DELETE FROM users WHERE username = 'admin'",
+        "DELETE FROM users WHERE username IN ('admin', 'accountant', 'staff')",
         { transaction },
       );
 
